@@ -13,6 +13,13 @@ critically rather than ruling on what's true.
 - [`SKILL.md`](./bias-review/SKILL.md) — Claude skill (uses `web_fetch` + web search)
 - [`GEM.md`](./bias-review/GEM.md) — Gemini Gem version (Google Search only)
 
+### [agent-standards](./agent-standards)
+Standards for how coding agents work, kept tool-neutral so the same file can be wired into
+any host. Copy one into a repo and commit it; see the folder README for per-tool wiring.
+
+- [`communication-standards.md`](./agent-standards/communication-standards.md) — how to talk to users, and how to write
+  anything that outlives the conversation: commits, comments, docs, specs
+
 ## Licence
 
 [MIT](./LICENSE)
