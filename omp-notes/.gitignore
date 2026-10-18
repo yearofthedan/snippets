@@ -1,0 +1,5 @@
+# extracted session data — the tool is publishable, the data is not
+notes.jsonl
+sessions.jsonl
+weaver/
+replay/

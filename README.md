@@ -20,6 +20,16 @@ any host. Copy one into a repo and commit it; see the folder README for per-tool
 - [`communication-standards.md`](./agent-standards/communication-standards.md) — how to talk to users, and how to write
   anything that outlives the conversation: commits, comments, docs, specs
 
+### [omp-notes](./omp-notes)
+Tools for measuring what OMP's advisor reviewers catch and cost, from the session
+transcripts on this machine. The transcripts and everything extracted from them stay local.
+
+- [`notes.py`](./omp-notes/notes.py) — a ledger of delivered advisor notes with what happened next, session
+  costs, and steers and aborts per session
+- [`replay.py`](./omp-notes/replay.py) — replays past reviews on another model or brief, judged against the
+  original note; [`compare.py`](./omp-notes/compare.py) lines runs up side by side
+- [`briefs/`](./omp-notes/briefs) — narrow reviewer briefs tested with the replay
+
 ## Licence
 
 [MIT](./LICENSE)
