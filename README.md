@@ -47,6 +47,9 @@ Rules load into every omp session. A repo replaces one with a file of the same n
 - [`durable-writing`](./plugins/dev-skills/rules/durable-writing.md) — relevance, placement, and living docs versus
   dated records
 - [`comments`](./plugins/dev-skills/rules/comments.md) — when a comment is allowed, and what replaces it otherwise
+- [`comments-tripwire`](./plugins/dev-skills/rules/comments-tripwire.md) — interrupts an edit that adds a comment
+  without an allowed prefix and points the agent at `comments`. Its pattern repeats `comments`' prefix list, as do
+  the lint checks in repos that adopt it: changing the list means changing all of them
 
 Skills load when a task calls for them:
 
