@@ -30,6 +30,14 @@ transcripts on this machine. The transcripts and everything extracted from them 
   original note; [`compare.py`](./omp-notes/compare.py) lines runs up side by side
 - [`briefs/`](./omp-notes/briefs) — narrow reviewer briefs tested with the replay
 
+### [dev-skills](./plugins/dev-skills)
+A plugin of development workflow skills, published from this repo's marketplace
+([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)). In omp:
+`/marketplace add yearofthedan/snippets`, then `/marketplace install dev-skills@snippets`.
+
+- [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
+  and removes dead branches, records noise, or writes the tests that kill them
+
 ## Licence
 
 [MIT](./LICENSE)

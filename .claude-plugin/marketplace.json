@@ -1,0 +1,12 @@
+{
+  "name": "snippets",
+  "owner": { "name": "yearofthedan" },
+  "metadata": { "description": "Skills and rules shared across my projects" },
+  "plugins": [
+    {
+      "name": "dev-skills",
+      "description": "Development workflow skills: mutation triage",
+      "source": "./plugins/dev-skills"
+    }
+  ]
+}
