@@ -66,6 +66,7 @@ The question that had to be answered, in one sentence.
 
 - Add a row to the index.
 - Link the record from the part of the architecture doc it explains, if the project keeps one.
+- Check the deciding force: each force the Decision says decided it favours the chosen option, in the table and in Consequences. Where either says that force favours another option, the record contradicts itself; resolve it before the record is done.
 - Re-read the record against the three tests and the table above. A record that fails one is deleted, not softened.
 
 ## Changing a decision
