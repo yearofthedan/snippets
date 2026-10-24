@@ -38,18 +38,25 @@ A plugin of development rules and skills, published from this repo's marketplace
 Rules load into every omp session. A repo replaces one with a file of the same name in its own
 `.omp/rules/`.
 
-- [`assertions`](./plugins/dev-skills/rules/assertions.md) — claims are checked against docs, a run or the repo
-  before they are written down
+- [`assertions`](./plugins/dev-skills/rules/assertions.md) — a claim is checked against the thing it is about, not
+  a stand-in for it, before it is written down
 - [`writing`](./plugins/dev-skills/rules/writing.md) — directness, concision and stated assumptions in anything
   written
 - [`working-with-the-user`](./plugins/dev-skills/rules/working-with-the-user.md) — presenting decisions, waiting
-  for answers, and handling corrections; main session only
+  for answers, handling corrections, and saying how to check handed-over work; main session only
 - [`durable-writing`](./plugins/dev-skills/rules/durable-writing.md) — relevance, placement, and living docs versus
   dated records
 - [`comments`](./plugins/dev-skills/rules/comments.md) — when a comment is allowed, and what replaces it otherwise
 - [`comments-tripwire`](./plugins/dev-skills/rules/comments-tripwire.md) — interrupts an edit that adds a comment
-  without an allowed prefix and points the agent at `comments`. Its pattern repeats `comments`' prefix list, as do
-  the lint checks in repos that adopt it: changing the list means changing all of them
+  without an allowed prefix and points the agent at `comments`
+- [`start-from-what-exists`](./plugins/dev-skills/rules/start-from-what-exists.md) — find what already covers a
+  test, doc, helper or rule, and add only the difference
+- [`rules-in-tension`](./plugins/dev-skills/rules/rules-in-tension.md) — when two rules point different ways,
+  follow what each is for, and say which gave way
+
+`comments`' prefix list is repeated in `comments-tripwire`'s pattern and in the comment checks of repos that adopt
+it. The tripwire accepts any directive or link a project might use, so a repo's check may be stricter; a prefix
+added to or dropped from `comments` changes the tripwire and those checks too.
 
 Skills load when a task calls for them:
 
