@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "dev-skills",
-      "description": "Development workflow skills: mutation triage",
+      "description": "Development rules and skills: writing, assertions, comments, ADRs, docs, mutation triage",
       "source": "./plugins/dev-skills"
     }
   ]

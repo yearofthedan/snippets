@@ -31,12 +31,31 @@ transcripts on this machine. The transcripts and everything extracted from them 
 - [`briefs/`](./omp-notes/briefs) — narrow reviewer briefs tested with the replay
 
 ### [dev-skills](./plugins/dev-skills)
-A plugin of development workflow skills, published from this repo's marketplace
+A plugin of development rules and skills, published from this repo's marketplace
 ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)). In omp:
 `/marketplace add yearofthedan/snippets`, then `/marketplace install dev-skills@snippets`.
 
+Rules load into every omp session. A repo replaces one with a file of the same name in its own
+`.omp/rules/`.
+
+- [`assertions`](./plugins/dev-skills/rules/assertions.md) — claims are checked against docs, a run or the repo
+  before they are written down
+- [`writing`](./plugins/dev-skills/rules/writing.md) — directness, concision and stated assumptions in anything
+  written
+- [`working-with-the-user`](./plugins/dev-skills/rules/working-with-the-user.md) — presenting decisions, waiting
+  for answers, and handling corrections; main session only
+- [`durable-writing`](./plugins/dev-skills/rules/durable-writing.md) — relevance, placement, and living docs versus
+  dated records
+- [`comments`](./plugins/dev-skills/rules/comments.md) — when a comment is allowed, and what replaces it otherwise
+
+Skills load when a task calls for them:
+
 - [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
   and removes dead branches, records noise, or writes the tests that kill them
+- [`writing-adrs`](./plugins/dev-skills/skills/writing-adrs/SKILL.md) — decides whether a decision needs a record,
+  and writes or supersedes one
+- [`writing-docs`](./plugins/dev-skills/skills/writing-docs/SKILL.md) — how a doc page opens, which kind of doc
+  content belongs in, and keeping a page on one subject
 
 ## Licence
 
