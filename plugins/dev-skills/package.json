@@ -6,6 +6,6 @@
     "extensions": ["./extensions/lessons.ts"]
   },
   "scripts": {
-    "test": "node --test extensions/"
+    "test": "node --test 'extensions/*.test.ts'"
   }
 }

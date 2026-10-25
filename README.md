@@ -75,7 +75,7 @@ Extensions run in every omp session, declared in the plugin's [`package.json`](.
   interrupted, asks the main session to capture an incident or carry on; at session start, says when incidents
   are waiting to be assessed. The record stays on the machine, in `lessons/` under the agent directory.
 
-`node --test plugins/dev-skills/extensions/` runs the extensions' tests.
+`node --test 'plugins/dev-skills/extensions/*.test.ts'` runs the extensions' tests.
 
 ## Licence
 
