@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import lessons, { type ContextResult, type Extension, type Message, inboxReminder, withNote } from './lessons.ts';
+import lessons, { type ContextResult, type Extension, type Message, inboxReminder } from './lessons.ts';
 
 type Handler = (event: { messages: Message[] }, context: { agent: { kind: string } }) => unknown;
 
@@ -13,42 +13,33 @@ const contextHandler = (kind = 'main') => {
 };
 
 const text = (value: string) => [{ type: 'text', text: value }];
-const note = { type: 'text', text: 'capture it' };
-const notes = (message: Message | undefined) => JSON.stringify(message?.content ?? '').match(/capture it/g)?.length ?? 0;
 
 describe('the capture note', () => {
-  it('rides on the builder’s latest message only', () => {
+  it('follows everything else in the request, leaving what came before byte-identical for the cache', () => {
     const messages = [
       { role: 'user', content: text('build it') },
-      { role: 'assistant', content: text('built') },
-      { role: 'user', content: text('no, use the existing parser') },
       { role: 'assistant', content: text('reading the parser') },
       { role: 'toolResult', content: text('parser.ts') },
     ];
-    const result = withNote(messages, note);
-    assert.equal(notes(result?.[0]), 0);
-    assert.equal(notes(result?.[2]), 1);
-    assert.match(JSON.stringify(result?.[2]), /no, use the existing parser/);
-    assert.deepEqual(result?.slice(3), messages.slice(3));
+    const result = contextHandler()(messages);
+    assert.deepEqual(result?.messages.slice(0, messages.length), messages);
+    assert.equal(result?.messages.length, messages.length + 1);
+    assert.match(JSON.stringify(result?.messages.at(-1)), /^\{"role":"user".*<system-reminder>.*lessons\/inbox\.md.*<\/system-reminder>/);
   });
 
   it('leaves the conversation it was given unchanged', () => {
     const messages = [{ role: 'user', content: text('build it') }];
     const before = structuredClone(messages);
-    withNote(messages, note);
+    contextHandler()(messages);
     assert.deepEqual(messages, before);
   });
 
-  it('keeps a message written as a plain string', () => {
-    const result = withNote([{ role: 'user', content: 'build it' }], note);
-    assert.match(JSON.stringify(result?.[0]), /"text":"build it"/);
-    assert.equal(notes(result?.[0]), 1);
+  it('waits for a message from the builder', () => {
+    assert.equal(contextHandler()([{ role: 'assistant', content: text('hello') }]), undefined);
   });
 
-  it('names the inbox to capture in, in the main session only', () => {
-    const messages = [{ role: 'user', content: text('the brief') }];
-    assert.match(JSON.stringify(contextHandler()(messages)), /lessons\/inbox\.md/);
-    assert.equal(contextHandler('sub')(messages), undefined);
+  it('stays out of a subagent’s conversation', () => {
+    assert.equal(contextHandler('sub')([{ role: 'user', content: text('the brief') }]), undefined);
   });
 });
 

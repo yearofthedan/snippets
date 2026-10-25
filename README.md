@@ -71,10 +71,11 @@ Skills load when a task calls for them:
 
 Extensions run in every omp session, declared in the plugin's [`package.json`](./plugins/dev-skills/package.json):
 
-- [`lessons`](./plugins/dev-skills/extensions/lessons.ts) — adds a note to the builder's latest message, in each
-  request only and never the saved session, asking the main session to capture an incident first when the message
-  corrects its work; at session start, says when incidents are waiting to be assessed. The record stays on the
-  machine, in `lessons/` under the agent directory.
+- [`lessons`](./plugins/dev-skills/extensions/lessons.ts) — ends each request with a `<system-reminder>` asking the
+  main session to capture an incident first when the builder's latest message corrects its work. The reminder goes
+  in the request only, after everything else, so the saved session never holds it and the cached prefix is
+  unchanged. At session start, it says when incidents are waiting to be assessed. The record stays on the machine,
+  in `lessons/` under the agent directory.
 
 `node --test 'plugins/dev-skills/extensions/*.test.ts'` runs the extensions' tests.
 

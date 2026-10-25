@@ -26,23 +26,19 @@ export const inboxReminder = (inboxText: string, now: Date): string | undefined 
   return `${dates.length} lesson incidents are waiting, the oldest from ${oldest}: run /skill:lessons to assess them.`;
 };
 
-export const withNote = (messages: Message[], note: { type: string; text: string }): Message[] | undefined => {
-  const at = messages.findLastIndex((message) => message.role === 'user');
-  if (at === -1) return undefined;
-  const latest = messages[at];
-  const content = typeof latest.content === 'string' ? [{ type: 'text', text: latest.content }] : latest.content;
-  if (!Array.isArray(content)) return undefined;
-  return messages.with(at, { ...latest, content: [...content, note] });
-};
-
 export default function lessons(pi: Extension): void {
   /* shortcut: a named profile (`omp --profile`) keeps its agent directory elsewhere, so its sessions read and point
      at the default one; resolve the active directory once a profile is used for real work. */
   const agentDirectory = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), '.omp', 'agent');
   const inbox = join(agentDirectory, 'lessons', 'inbox.md');
   const note = {
-    type: 'text',
-    text: `If this message corrects or contradicts your earlier work, capture an incident in \`${inbox}\` as skill://lessons says before you reply.`,
+    role: 'user',
+    content: [
+      {
+        type: 'text',
+        text: `<system-reminder>If the builder's latest message corrects or contradicts your earlier work and you have not captured it yet, capture an incident in \`${inbox}\` as skill://lessons says before you reply.</system-reminder>`,
+      },
+    ],
   };
 
   pi.on('session_start', (_event, context) => {
@@ -52,8 +48,7 @@ export default function lessons(pi: Extension): void {
   });
 
   pi.on('context', (event, context) => {
-    if (context.agent?.kind === 'sub') return undefined;
-    const messages = withNote(event.messages, note);
-    return messages === undefined ? undefined : { messages };
+    if (context.agent?.kind === 'sub' || !event.messages.some((message) => message.role === 'user')) return undefined;
+    return { messages: [...event.messages, note] };
   });
 }
