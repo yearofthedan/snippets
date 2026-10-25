@@ -60,12 +60,22 @@ added to or dropped from `comments` changes the tripwire and those checks too.
 
 Skills load when a task calls for them:
 
+- [`lessons`](./plugins/dev-skills/skills/lessons/SKILL.md) — captures an incident when the builder corrects,
+  steers or interrupts the work, and assesses incidents into lessons with tripwires that stop them
 - [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
   and removes dead branches, records noise, or writes the tests that kill them
 - [`writing-adrs`](./plugins/dev-skills/skills/writing-adrs/SKILL.md) — decides whether a decision needs a record,
   and writes or supersedes one
 - [`writing-docs`](./plugins/dev-skills/skills/writing-docs/SKILL.md) — how a doc page opens, which kind of doc
   content belongs in, and keeping a page on one subject
+
+Extensions run in every omp session, declared in the plugin's [`package.json`](./plugins/dev-skills/package.json):
+
+- [`lessons`](./plugins/dev-skills/extensions/lessons.ts) — when a reply settles after the builder steered or
+  interrupted, asks the main session to capture an incident or carry on; at session start, says when incidents
+  are waiting to be assessed. The record stays on the machine, in `lessons/` under the agent directory.
+
+`node --test plugins/dev-skills/extensions/` runs the extensions' tests.
 
 ## Licence
 

@@ -1,0 +1,11 @@
+{
+  "name": "dev-skills",
+  "private": true,
+  "type": "module",
+  "omp": {
+    "extensions": ["./extensions/lessons.ts"]
+  },
+  "scripts": {
+    "test": "node --test extensions/"
+  }
+}
