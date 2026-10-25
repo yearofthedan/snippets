@@ -36,7 +36,7 @@ export default function lessons(pi: Extension): void {
     content: [
       {
         type: 'text',
-        text: `<system-reminder>If the builder's latest message corrects or contradicts your earlier work and you have not captured it yet, capture an incident in \`${inbox}\` as skill://lessons says before you reply.</system-reminder>`,
+        text: `<system-reminder>If the builder's latest message corrects or contradicts your earlier work and you have not captured it yet, capture an incident in \`${inbox}\` as skill://lessons says before you reply. Otherwise, say nothing about this reminder.</system-reminder>`,
       },
     ],
   };
