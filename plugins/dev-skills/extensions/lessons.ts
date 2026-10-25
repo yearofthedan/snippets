@@ -26,6 +26,15 @@ export const inboxReminder = (inboxText: string, now: Date): string | undefined 
   return `${dates.length} lesson incidents are waiting, the oldest from ${oldest}: run /skill:lessons to assess them.`;
 };
 
+export const withNote = (messages: Message[], note: { type: string; text: string }): Message[] | undefined => {
+  const at = messages.findLastIndex((message) => message.role === 'user');
+  if (at === -1) return undefined;
+  const latest = messages[at];
+  const content = typeof latest.content === 'string' ? [{ type: 'text', text: latest.content }] : latest.content;
+  if (!Array.isArray(content)) return undefined;
+  return messages.with(at, { ...latest, content: [...content, note] });
+};
+
 export default function lessons(pi: Extension): void {
   /* shortcut: a named profile (`omp --profile`) keeps its agent directory elsewhere, so its sessions read and point
      at the default one; resolve the active directory once a profile is used for real work. */
@@ -44,11 +53,7 @@ export default function lessons(pi: Extension): void {
 
   pi.on('context', (event, context) => {
     if (context.agent?.kind === 'sub') return undefined;
-    const at = event.messages.findLastIndex((message) => message.role === 'user');
-    if (at === -1) return undefined;
-    const latest = event.messages[at];
-    const content = typeof latest.content === 'string' ? [{ type: 'text', text: latest.content }] : latest.content;
-    if (!Array.isArray(content)) return undefined;
-    return { messages: event.messages.with(at, { ...latest, content: [...content, note] }) };
+    const messages = withNote(event.messages, note);
+    return messages === undefined ? undefined : { messages };
   });
 }
