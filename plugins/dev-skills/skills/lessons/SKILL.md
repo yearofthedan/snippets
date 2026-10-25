@@ -1,6 +1,6 @@
 ---
 name: lessons
-description: Capture an incident when the builder corrects, steers or interrupts your work, and assess the captured incidents into lessons with tripwires that stop them. Use when a correction lands, when the capture check names one, or when the builder asks to assess lessons.
+description: Capture an incident when the builder corrects, steers or interrupts your work, and assess the captured incidents into lessons with tripwires that stop them. Use when a correction lands, including one phrased as a question or an aside, or when the builder asks to assess lessons.
 ---
 
 # Lessons
@@ -16,7 +16,7 @@ Create either file when it is missing.
 
 ## Capture
 
-Capture when the builder corrects your work, steers it, or interrupts it, when a review finds something you claimed was done, and when a hook refuses a step. Capture straight away rather than at hand-over: the detail is gone by then. The capture check at the end of a reply names the steers and interrupts it saw; a steer that only adds information, without correcting anything, is not an incident.
+Capture when the builder corrects your work, steers it, or interrupts it, when a review finds something you claimed was done, and when a hook refuses a step. Capture straight away, before replying, rather than at hand-over: the detail is gone by then. A correction often arrives as a question ("is a 100 ms cap too strict?") or an aside ("worth noting that AA is a baseline"): it counts when your reply would concede the point. A message that only adds information is not an incident.
 
 Append one entry per incident to `inbox.md`:
 
