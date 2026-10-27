@@ -60,6 +60,8 @@ added to or dropped from `comments` changes the tripwire and those checks too.
 
 Skills load when a task calls for them:
 
+- [`designing`](./plugins/dev-skills/skills/designing/SKILL.md) — works out and shows what the user sees, from the
+  builder's design and the project's principles, in every state the user reaches
 - [`lessons`](./plugins/dev-skills/skills/lessons/SKILL.md) — captures an incident when the builder corrects,
   steers or interrupts the work, and assesses incidents into lessons with tripwires that stop them
 - [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
