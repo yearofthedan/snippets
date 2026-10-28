@@ -46,6 +46,7 @@ Judge each state as the user sees it, on a fresh full-page load of the build han
 - Under 0.1 s, show only the result. Past 1 s, show that it is working. Past 10 s, show progress and a way to stop ([NN/g](https://www.nngroup.com/articles/response-times-3-important-limits/)).
 - Motion answers an action and is as short as it can be without jarring: about 100 ms for small feedback, 200–300 ms for a larger change, shorter still for something done often ([NN/g](https://www.nngroup.com/articles/animation-duration/)).
 - Never make the user wait for an animation before their next action, and honour `prefers-reduced-motion` ([Apple HIG](https://developer.apple.com/design/human-interface-guidelines/motion)).
+- A still screenshot is not evidence of motion. Before handing motion over, run [`motion-check.ts`](motion-check.ts) against the build: `node <skill directory>/motion-check.ts <config.mjs>`, from a project with Playwright installed. The config names the page, what to watch and the moves to make, and the script fails motion at open, an edge that turns back or snaps, a size outside its start and end, opacity that jumps, motion past its duration or under reduced motion, and a move that ends in the wrong place when a resize or a second move interrupts it. Include a move that hides something, so the fades are checked too.
 
 ## Mistakes and recovery
 
