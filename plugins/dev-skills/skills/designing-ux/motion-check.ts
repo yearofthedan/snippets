@@ -118,6 +118,45 @@ export const faultsIn = (
   return faults;
 };
 
+export const landingJumps = (frames: readonly Frame[], limit = 8): string[] => {
+  for (let i = 1; i < frames.length; i++) {
+    const before = frames[i - 1]!;
+    const now = frames[i]!;
+    if (before.running === 0 || now.running > 0) continue;
+    const jumps = Object.entries(now.boxes).flatMap(([key, box]) => {
+      const was = before.boxes[key];
+      if (!shown(box) || !shown(was)) return [];
+      const step = Math.max(...EDGES.map((edge) => Math.abs(box[edge] - was[edge])));
+      return step > limit ? [`${key}: jumps ${Math.round(step)} px as the motion stops at ${Math.round(now.t)} ms, cut short`] : [];
+    });
+    if (jumps.length > 0) return jumps;
+  }
+  return [];
+};
+
+export const startJumps = (frames: readonly Frame[], { limit = 8, share = 0.6, within = 4 } = {}): string[] => {
+  const last = frames.at(-1);
+  if (last === undefined) return [];
+  for (let i = 1; i < Math.min(frames.length, within + 1); i++) {
+    const before = frames[i - 1]!;
+    const now = frames[i]!;
+    const jumps = Object.entries(now.boxes).flatMap(([key, box]) => {
+      const was = before.boxes[key];
+      const end = last.boxes[key];
+      if (!shown(box) || !shown(was) || end === undefined) return [];
+      return EDGES.flatMap((edge) => {
+        const step = Math.abs(box[edge] - was[edge]);
+        const toGo = Math.abs(end[edge] - was[edge]);
+        return step > limit && step > toGo * share
+          ? [`${key}: edge ${edge} jumps ${Math.round(step)} of ${Math.round(toGo)} px as the move starts, at ${Math.round(now.t)} ms`]
+          : [];
+      }).slice(0, 1);
+    });
+    if (jumps.length > 0) return jumps;
+  }
+  return [];
+};
+
 export const layoutDifferences = (moved: Frame, stepped: Frame): string[] =>
   Object.entries(stepped.boxes).flatMap(([key, want]) => {
     const got = moved.boxes[key];
@@ -245,9 +284,12 @@ export const checkMotion = async (newPage: () => Promise<Page>, config: Config) 
       continue;
     }
     await doubled.waitForTimeout(duration / 4);
-    await next.run(doubled);
-    await doubled.waitForTimeout(settle(duration));
-    report[`${move.name}, then ${next.name} part-way`] = layoutDifferences(await endState(doubled), stepped[i + 1]!);
+    const frames = await sampled(doubled, () => next.run(doubled));
+    report[`${move.name}, then ${next.name} part-way`] = [
+      ...startJumps(frames),
+      ...landingJumps(frames),
+      ...layoutDifferences(frames.at(-1)!, stepped[i + 1]!),
+    ];
     break;
   }
 

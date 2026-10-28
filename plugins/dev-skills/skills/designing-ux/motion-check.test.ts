@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { type Box, type Frame, faultsIn, layoutDifferences } from './motion-check.ts';
+import { type Box, type Frame, faultsIn, landingJumps, layoutDifferences, startJumps } from './motion-check.ts';
 
 const box = (l: number, t: number, w: number, h: number, o = 1): Box => ({ l, r: l + w, t, b: t + h, o, v: 'visible' });
 const frames = (...steps: Box[]): Frame[] =>
@@ -64,5 +64,29 @@ describe('layoutDifferences', () => {
   it('finds a box shown that should be hidden', () => {
     const hidden = { ...box(0, 0, 10, 10), o: 0 };
     assert.deepEqual(layoutDifferences(at({ a: box(0, 0, 10, 10) }), at({ a: hidden })), ['a: shown, should be hidden']);
+  });
+});
+
+describe('landingJumps', () => {
+  const at = (t: number, running: number, l: number): Frame => ({ t, running, boxes: { a: box(l, 0, 10, 10) } });
+
+  it('passes motion that comes to rest by itself', () => {
+    assert.deepEqual(landingJumps([at(0, 1, 0), at(16, 1, 80), at(32, 1, 99), at(48, 0, 100)]), []);
+  });
+
+  it('finds motion cut short, which jumps as it stops', () => {
+    assert.deepEqual(landingJumps([at(0, 1, 0), at(16, 1, 60), at(32, 0, 100)]), ['a: jumps 40 px as the motion stops at 32 ms, cut short']);
+  });
+});
+
+describe('startJumps', () => {
+  const at = (t: number, l: number): Frame => ({ t, running: 1, boxes: { a: box(l, 0, 10, 10) } });
+
+  it('passes a move that eases out from where the box was drawn', () => {
+    assert.deepEqual(startJumps([at(0, 0), at(16, 30), at(32, 55), at(48, 75), at(64, 90), at(80, 100)]), []);
+  });
+
+  it('finds a move that jumps most of the way before it moves, as when a running move is stopped', () => {
+    assert.deepEqual(startJumps([at(0, 0), at(16, 80), at(32, 90), at(48, 100)]), ['a: edge l jumps 80 of 100 px as the move starts, at 16 ms']);
   });
 });
