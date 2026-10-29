@@ -78,8 +78,19 @@ Extensions run in every omp session, declared in the plugin's [`package.json`](.
   in the request only, after everything else, so the saved session never holds it and the cached prefix is
   unchanged. At session start, it says when incidents are waiting to be assessed. The record stays on the machine,
   in `lessons/` under the agent directory.
+- [`refuse-an-edit-in-the-main-worktree`](./plugins/dev-skills/extensions/refuse-an-edit-in-the-main-worktree.ts) —
+  refuses a subagent's edit, write or shell write to a tracked file in the main worktree, which the builder and other
+  sessions share
+- [`refuse-a-step-around-the-flow`](./plugins/dev-skills/extensions/refuse-a-step-around-the-flow.ts) — refuses a
+  branch switch in the main worktree, a restore or checkout over uncommitted work, a force push, and a commit that
+  skips or lacks the pre-commit hook. Where the repo has a `./do` wrapper, a push goes only to the story branch
+  (`<issue number>-…`), and where `./do` has a `ready` task, `gh pr ready` goes through it.
+- [`refuse-a-direct-add`](./plugins/dev-skills/extensions/refuse-a-direct-add.ts) — where `./do` has an `add` task,
+  refuses adding a dependency or running a package any other way
 
-`node --test 'plugins/dev-skills/extensions/*.test.ts'` runs the extensions' tests.
+`npm test --prefix plugins/dev-skills` runs the plugin's tests. Each change to the plugin bumps `version` in its
+`package.json` in the same commit: the minor number for a new skill, rule or extension, the patch number for a fix.
+[`.omp/rules/bump-the-plugin-version.md`](./.omp/rules/bump-the-plugin-version.md) reminds an agent editing the plugin.
 
 ## Licence
 

@@ -1,9 +1,15 @@
 {
   "name": "dev-skills",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "omp": {
-    "extensions": ["./extensions/lessons.ts"]
+    "extensions": [
+      "./extensions/lessons.ts",
+      "./extensions/refuse-an-edit-in-the-main-worktree.ts",
+      "./extensions/refuse-a-step-around-the-flow.ts",
+      "./extensions/refuse-a-direct-add.ts"
+    ]
   },
   "scripts": {
     "test": "node --test 'extensions/*.test.ts' 'skills/*/*.test.ts'"
