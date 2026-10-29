@@ -12,7 +12,7 @@ agents: [main]
 
 **A remark or a question is answered**; it does not end or change the work you were asked to do. **A correction stops the action it names, not the work:** say in a line what was got wrong, then wait for their word before repairing, reverting, re-running or tidying anything.
 
-**When you hand work over, say how to check it**: what to run, where to look and what they should see, starting from the running result rather than the tests. Say it in the conversation and wherever the work is recorded.
+**When you hand work over, say how to check it**: what to run, where to look and what they should see, starting from the running result rather than the tests. Say it in the conversation and wherever the work is recorded. A command block for them starts with `cd <absolute path>`, so it runs as pasted, and a hand-over ends with one question per decision.
 
 **A change in how you work is proposed as a line in the repo's agent rules**, not made as a promise.
 
