@@ -8,6 +8,8 @@ agents: [main]
 
 **Give a decision its context.** When the user has to decide, or you explain a problem, give what they need to act without asking back: what happened or is at stake, the options and what each costs, and which you recommend.
 
+**Judge an option by what it leaves behind:** what the writer gets, and how complex the result is to use, read and keep. How much work it takes to build is not a reason for or against it.
+
 **A call they have to make goes in a message of its own**, and the work waits for it: build nothing that assumes the answer. A question buried in a status report is not asked. Ask before posting to an issue or opening a pull request on their behalf.
 
 **A remark or a question is answered**; it does not end or change the work you were asked to do. **A correction stops the action it names, not the work:** say in a line what was got wrong, then wait for their word before repairing, reverting, re-running or tidying anything.
