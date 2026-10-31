@@ -186,6 +186,9 @@ describe('a git push', () => {
     ['git push 2>/dev/null --force origin main', clean],
     ['GIT_TRACE=1 git push --force origin main', clean],
     ['git push \\\n--force', clean],
+    ['command git push --force origin main', clean],
+    ['builtin git push --force origin main', clean],
+    ['exec git push --force origin main', clean],
   ] as [string, string][]) {
     it(`refuses ${command}`, () => {
       assert.equal(refused(command, cwd), true);
@@ -206,6 +209,9 @@ describe('a git push', () => {
     ['git push -u origin HEAD', clean],
     ['git push origin 73-fix-a-dodgy-restore', clean],
     ['git commit -m "stop: git push --force blocked"', clean],
+    ['command git push -u origin HEAD', clean],
+    ['builtin git push -u origin HEAD', clean],
+    ['exec git push -u origin HEAD', clean],
   ] as [string, string][]) {
     it(`passes ${command}`, () => {
       assert.equal(refused(command, cwd), false);
@@ -236,6 +242,16 @@ describe('the directory the call runs in', () => {
 
   it('refuses a push on the branch of the worktree the call names', () => {
     assert.equal(refused('git push -u origin HEAD', linked, main), true);
+  });
+
+  it('reads a push after cd against the worktree the cd names', () => {
+    assert.equal(refused(`cd ${linked} && git push -u origin HEAD`, main), false);
+    assert.equal(refused(`cd ${main} && git push -u origin HEAD`, linked), true);
+  });
+
+  it('resolves a relative cd against the directory the call runs in', () => {
+    assert.equal(refused(`cd ${basename(linked)} && git push -u origin HEAD`, dirname(linked)), false);
+    assert.equal(refused(`cd ${basename(main)} && git push -u origin HEAD`, dirname(main)), true);
   });
 });
 

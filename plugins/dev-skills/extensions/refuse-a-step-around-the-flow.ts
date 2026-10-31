@@ -292,14 +292,26 @@ const hooksOffRefusal = (env: Record<string, string>, check: string): string | u
     : `\`${off}=0\` turns the pre-commit hook off, so the commit would land without ${check}. Commit without it.`;
 };
 
+const RUNS_ANOTHER_COMMAND: Record<string, true> = {
+  env: true,
+  command: true,
+  builtin: true,
+  exec: true,
+};
+
 const environmentOf = (words: string[]): { env: Record<string, string>; rest: string[] } => {
   const env: Record<string, string> = {};
   let start = 0;
-  if (words[0]?.split('/').pop() === 'env') start = 1;
-  for (; start < words.length; start += 1) {
+  while (start < words.length) {
+    const program = words[start]?.split('/').pop() ?? '';
+    if (Object.hasOwn(RUNS_ANOTHER_COMMAND, program)) {
+      start += 1;
+      continue;
+    }
     const assignment = /^([A-Za-z_]\w*)=(.*)$/s.exec(words[start] ?? '');
     if (assignment === null) break;
     env[assignment[1] ?? ''] = assignment[2] ?? '';
+    start += 1;
   }
   return { env, rest: words.slice(start) };
 };
@@ -344,19 +356,24 @@ export default function refuseAStepAroundTheFlow(pi: Extension): void {
     if (event.toolName !== 'bash') return undefined;
     const command = event.input.command;
     if (typeof command !== 'string') return undefined;
-    const callCwd = callDirectory(event.input, context.cwd);
+    let dir = callDirectory(event.input, context.cwd);
     for (const found of wordsPerCommand(command)) {
       const { env, rest: words } = environmentOf(found);
       const program = words[0]?.split('/').pop() ?? '';
+      if (program === 'cd') {
+        const target = words[1];
+        if (target !== undefined) dir = resolve(dir, target);
+        continue;
+      }
       if (program === 'gh') {
         const ready = words.indexOf('pr') >= 0 && words[words.indexOf('pr') + 1] === 'ready';
-        const root = repositoryRoot(callCwd);
+        const root = repositoryRoot(dir);
         if (ready && !words.includes('--undo') && root !== undefined && hasDoTask(root, 'ready'))
           return { block: true, reason: notReadyYet };
         continue;
       }
       if (program !== 'git') continue;
-      const invocation = gitInvocation(words, callCwd);
+      const invocation = gitInvocation(words, dir);
       if (invocation === undefined) continue;
       const { subcommand, args, cwd } = invocation;
       const reason = gitReason(subcommand, args, cwd, env);
