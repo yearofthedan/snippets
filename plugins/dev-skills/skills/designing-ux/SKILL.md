@@ -24,7 +24,7 @@ A look is cheapest to fix in a prototype the builder plays with. Make the first 
 5. **Name what stays constant**: "one fixed zoom level" picks a different mechanism from "fit the content".
 6. **Read what governs the look**, in its own words and for how binding it says it is: the design principles, the standards, and the glossary entry for each term the interaction touches. A working idea is not a ruling, and an option it doesn't rule out stays open.
 7. **Reuse before adding.** Read the nearest existing component, and keep one name for one action through the whole path.
-8. **Cost each option from its smallest version**, and a lost behaviour, such as heading depth, from the platform's own means of keeping it, such as `aria-level`.
+8. **Weigh the options as [weighing-options](../weighing-options/SKILL.md) says**, and cost a lost behaviour, such as heading depth, from the platform's own means of keeping it, such as `aria-level`.
 
 ## Showing every state
 

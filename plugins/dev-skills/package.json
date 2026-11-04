@@ -1,6 +1,6 @@
 {
   "name": "dev-skills",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "omp": {
@@ -8,7 +8,9 @@
       "./extensions/lessons.ts",
       "./extensions/refuse-an-edit-in-the-main-worktree.ts",
       "./extensions/refuse-a-step-around-the-flow.ts",
-      "./extensions/refuse-a-direct-add.ts"
+      "./extensions/refuse-a-direct-add.ts",
+      "./extensions/refuse-a-server-in-the-shell.ts",
+      "./extensions/refuse-an-edit-before-an-answer.ts"
     ]
   },
   "scripts": {

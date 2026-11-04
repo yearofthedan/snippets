@@ -66,6 +66,9 @@ Skills load when a task calls for them:
   steers or interrupts the work, and assesses incidents into lessons with tripwires that stop them
 - [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
   and removes dead branches, records noise, or writes the tests that kill them
+- [`weighing-options`](./plugins/dev-skills/skills/weighing-options/SKILL.md) — puts options to the user on what
+  each leaves behind: the goal first, every option and variant, the same rows for each, and a recommendation that
+  cites a row other than cost
 - [`writing-adrs`](./plugins/dev-skills/skills/writing-adrs/SKILL.md) — decides whether a decision needs a record,
   and writes or supersedes one
 - [`writing-docs`](./plugins/dev-skills/skills/writing-docs/SKILL.md) — how a doc page opens, which kind of doc
@@ -87,6 +90,10 @@ Extensions run in every omp session, declared in the plugin's [`package.json`](.
   (`<issue number>-…`), and where `./do` has a `ready` task, `gh pr ready` goes through it.
 - [`refuse-a-direct-add`](./plugins/dev-skills/extensions/refuse-a-direct-add.ts) — where `./do` has an `add` task,
   refuses adding a dependency or running a package any other way
+- [`refuse-a-server-in-the-shell`](./plugins/dev-skills/extensions/refuse-a-server-in-the-shell.ts) — refuses a
+  shell call with no `name` that would hold the shell: one that waits for readiness, or a pty with no deadline
+- [`refuse-an-edit-before-an-answer`](./plugins/dev-skills/extensions/refuse-an-edit-before-an-answer.ts) — when
+  the builder's latest message ends in a question, refuses the main session's file edits until a reply holds text
 
 `npm test --prefix plugins/dev-skills` runs the plugin's tests. Each change to the plugin bumps `version` in its
 `package.json` in the same commit: the minor number for a new skill, rule or extension, the patch number for a fix.
