@@ -1,118 +1,121 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import cacheGuard, { type Context, type Extension, freshShare } from './cache-guard.ts';
+import cacheGuard, { type Context, type Extension, freshShare, sawCache } from './cache-guard.ts';
 
 type Usage = { input?: number; cacheRead?: number; cacheWrite?: number };
 type Event = { message: { usage?: Usage } };
 type Handler = (event: Event, context: Context) => void;
+type Sent = { payload: { customType: string; content: string }; options?: { deliverAs?: string; triggerTurn?: boolean } };
 
-const handler = (): Handler => {
-  let registered: Handler | undefined;
+const start = (idle = true) => {
+  let handler: Handler | undefined;
+  const sent: Sent[] = [];
+  let aborts = 0;
   const pi: Extension = {
     on: (_event, next) => {
-      registered = next as Handler;
+      handler = next as Handler;
+    },
+    sendMessage: (payload, options) => {
+      sent.push({ payload, options });
     },
   };
   cacheGuard(pi);
-  if (registered === undefined) throw new Error('the extension registered no handler');
-  return registered;
-};
-
-const context = () => {
-  const seen: string[] = [];
-  let aborts = 0;
-  const stub: Context = {
-    agent: { kind: 'main' },
-    ui: { notify: (text) => seen.push(text) },
+  if (handler === undefined) throw new Error('the extension registered no handler');
+  const context: Context = {
+    isIdle: () => idle,
     abort: () => {
       aborts += 1;
     },
+    setTimeout: (fn) => {
+      fn();
+    },
   };
-  return { stub, seen, aborts: () => aborts };
+  return {
+    turn: (usage: Usage) => handler?.({ message: { usage } }, context),
+    sent,
+    aborts: () => aborts,
+  };
 };
 
-const turn = (next: Handler, message: Event['message'], stub: Context): void => next({ message }, stub);
-
-const rewritten = { usage: { input: 2, cacheRead: 17094, cacheWrite: 91555 } };
-const healthy = { usage: { input: 110, cacheRead: 19921, cacheWrite: 0 } };
+const rewritten = (): Usage => ({ input: 2, cacheRead: 17_280, cacheWrite: 90_720 });
+const healthy = (): Usage => ({ input: 110, cacheRead: 19_921, cacheWrite: 0 });
 
 describe('the fresh share', () => {
   it('reads a re-written prompt as nearly all fresh', () => {
-    const { share, prompt } = freshShare(rewritten.usage);
-    assert.equal(prompt, 108651);
+    const { share, prompt } = freshShare(rewritten());
+    assert.equal(prompt, 108_002);
     assert.equal(Math.round(share * 100), 84);
   });
 
   it('reads a reused prompt as cached', () => {
-    assert.ok(freshShare(healthy.usage).share < 0.01);
+    assert.ok(freshShare(healthy()).share < 0.01);
   });
 
   it('counts a provider that reports no cache writes on a miss', () => {
-    assert.equal(freshShare({ input: 94000, cacheRead: 0, cacheWrite: 0 }).share, 1);
-  });
-
-  it('ignores a prompt under the floor', () => {
-    assert.ok(freshShare({ input: 5000, cacheRead: 0, cacheWrite: 2000 }).prompt < 40_000);
+    assert.equal(freshShare({ input: 94_000, cacheRead: 0, cacheWrite: 0 }).share, 1);
   });
 });
 
-describe('the guard', () => {
-  it('stays quiet through healthy turns', () => {
-    const next = handler();
-    const { stub, seen, aborts } = context();
-    for (let index = 0; index < 4; index += 1) turn(next, healthy, stub);
-    assert.equal(seen.length, 0);
-    assert.equal(aborts(), 0);
+describe('arming', () => {
+  it('needs a turn that reported a cache read or a write', () => {
+    assert.equal(sawCache({ input: 100_000, cacheRead: 0, cacheWrite: 0 }), false);
+    assert.equal(sawCache({ input: 2, cacheRead: 100, cacheWrite: 0 }), true);
+    assert.equal(sawCache({ input: 2, cacheRead: 0, cacheWrite: 100 }), true);
   });
 
-  it('warns on the second re-write and stops on the third', () => {
-    const next = handler();
-    const { stub, seen, aborts } = context();
-    turn(next, rewritten, stub);
-    assert.equal(seen.length, 0);
-    turn(next, rewritten, stub);
-    assert.equal(seen.length, 1);
-    assert.equal(aborts(), 0);
-    turn(next, rewritten, stub);
-    assert.equal(seen.length, 2);
-    assert.equal(aborts(), 1);
-    assert.match(seen.at(-1) ?? '', /^cache-guard: 84% of a 108,651-token prompt came back as fresh tokens, 3 turns running\..*Stopping the run/);
+  it('never stops a provider that reports no cache at all', () => {
+    const guard = start();
+    for (let index = 0; index < 6; index += 1) guard.turn({ input: 100_000, cacheRead: 0, cacheWrite: 0 });
+    assert.equal(guard.aborts(), 0);
+    assert.equal(guard.sent.length, 0);
   });
 
-  it('forgets the run as soon as one turn is reused', () => {
-    const next = handler();
-    const { stub, seen, aborts } = context();
-    turn(next, rewritten, stub);
-    turn(next, rewritten, stub);
-    const warned = seen.length;
-    turn(next, healthy, stub);
-    turn(next, rewritten, stub);
-    turn(next, rewritten, stub);
-    assert.equal(seen.length, warned + 1);
-    assert.equal(aborts(), 0);
+  it('does not count the turn that armed it', () => {
+    const guard = start();
+    guard.turn({ input: 2, cacheRead: 0, cacheWrite: 90_000 });
+    guard.turn(rewritten());
+    guard.turn(rewritten());
+    assert.equal(guard.aborts(), 0);
+  });
+});
+
+describe('the stop', () => {
+  it('stops on the third consecutive rewrite and leaves one note', () => {
+    const guard = start();
+    guard.turn(healthy());
+    guard.turn(rewritten());
+    guard.turn(rewritten());
+    assert.equal(guard.aborts(), 0);
+    guard.turn(rewritten());
+    assert.equal(guard.aborts(), 1);
+    assert.equal(guard.sent.length, 1);
+    assert.match(
+      guard.sent[0]?.payload.content ?? '',
+      /^cache-guard: stopped this run — 84% of a 108,002-token prompt came back as fresh tokens, 3 turns running\.$/,
+    );
+    assert.equal(guard.sent[0]?.payload.customType, 'cache-guard');
+    assert.equal(guard.sent[0]?.options?.deliverAs, 'nextTurn');
+    assert.equal(guard.sent[0]?.options?.triggerTurn, false);
   });
 
-  it('ignores a short prompt that is fully re-sent', () => {
-    const next = handler();
-    const { stub, seen, aborts } = context();
-    for (let index = 0; index < 4; index += 1) turn(next, { usage: { input: 5000, cacheWrite: 2000 } }, stub);
-    assert.equal(seen.length, 0);
-    assert.equal(aborts(), 0);
+  it('clears the count when a turn is reused', () => {
+    const guard = start();
+    guard.turn(healthy());
+    guard.turn(rewritten());
+    guard.turn(rewritten());
+    guard.turn(healthy());
+    guard.turn(rewritten());
+    guard.turn(rewritten());
+    assert.equal(guard.aborts(), 0);
   });
 
-  it('stays out of a subagent', () => {
-    const next = handler();
-    const { stub, seen, aborts } = context();
-    for (let index = 0; index < 3; index += 1) turn(next, rewritten, { ...stub, agent: { kind: 'sub' } });
-    assert.equal(seen.length, 0);
-    assert.equal(aborts(), 0);
-  });
-
-  it('ignores a turn with no usage', () => {
-    const next = handler();
-    const { stub, seen, aborts } = context();
-    for (let index = 0; index < 6; index += 1) next({ message: {} }, stub);
-    assert.equal(seen.length, 0);
-    assert.equal(aborts(), 0);
+  it('leaves no note when the session never goes idle', () => {
+    const guard = start(false);
+    guard.turn(healthy());
+    guard.turn(rewritten());
+    guard.turn(rewritten());
+    guard.turn(rewritten());
+    assert.equal(guard.aborts(), 1);
+    assert.equal(guard.sent.length, 0);
   });
 });
