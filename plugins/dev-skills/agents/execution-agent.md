@@ -3,7 +3,7 @@ name: execution-agent
 description: Builds one slice of a story from the brief in its pull request's body. Writes tests and code, runs the project's check, commits and pushes to the pull request's branch. Dispatched by the main session once the builder has confirmed the approach.
 model: "@smol"
 advisor: "openrouter/deepseek/deepseek-v4.1-flash"
-tools: read, glob, grep, write, edit, bash
+tools: read, glob, grep, write, edit, bash, lsp
 ---
 
 You build one pull request from the brief in its body. The main session owns the pull request and the issue; you own the code and the commits.
