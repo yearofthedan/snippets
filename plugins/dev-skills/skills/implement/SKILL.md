@@ -24,9 +24,10 @@ An issue with no plan comment gets a plan before any code.
 
 1. Read the issue, its epic, the architecture doc and the decision records it touches.
 2. List the open questions whose answer changes which slices there are, what they hold, or what one must decide: what a tool, library or the platform does, or whether an approach works here. Probe each outside the working tree: current docs linked beside the finding, or a short run in a temporary directory or scratch clone. Keep a run's output as it came out and post it on the issue in its own comment before anything cites a number from it; the plan, record or pull request body links that comment. A question no probe settles is listed as open. A probe that becomes code the story ships (a harness, fixture or script) stops, and that code becomes an enabling slice. No open questions: say so.
-3. Cut the slices. Each is thin, stands on its own and ends in something the builder can check. Enabling slices come first, including a preparatory refactor where the files a slice touches strain the standards or the architecture. Prefer slices that need only `main`, so one can start while another is in review.
-4. Propose them, numbered, each an imperative phrase that becomes the pull request title. Add each open question: what was probed, what it showed, what is still open, which slices rest on it.
-5. Post nothing until the builder confirms. Then post each probe output, then the slices as a checklist comment with the open questions and findings beneath it, and start the first unstarted one.
+3. Assess the files each candidate slice would touch against the standards index and the architecture doc. Where the change would copy or strain a pattern, weigh continuing it against refactoring first, as weighing-options says, and take the options to the builder in the proposal. A chosen refactor becomes an enabling slice. Cleanup in a file a slice already touches is part of that slice.
+4. Cut the slices. Each is thin, stands on its own and ends in something the builder can check. Enabling slices come first. Prefer slices that need only `main`, so one can start while another is in review.
+5. Propose them, numbered, each an imperative phrase that becomes the pull request title. Add each open question: what was probed, what it showed, what is still open, which slices rest on it, and each strained pattern with the options weighed.
+6. Post nothing until the builder confirms. Then post each probe output, then the slices as a checklist comment with the open questions and findings beneath it, and start the first unstarted one.
 
 Tick a slice off as its pull request merges. The last unticked slice's pull request closes the issue.
 
@@ -45,7 +46,7 @@ Before a slice's first commit, send the builder one message with each class belo
 | What the writer sees | Copy, interaction and layout, worked out as designing-ux says and shown from the repo's built app with the change applied in a scratch clone, never a standalone mock. Serve it; give the address and what to try |
 | Stored data | Its shape, and what happens to data already saved |
 | Test strategy | The level of each case, what is faked, the file each lands in |
-| Standards and architecture | Read every file the change touches against the standards index and the architecture doc; list each place it breaks or strains one, with file and line. For each place the change would copy or build on, weigh continuing the pattern against refactoring first, as weighing-options says, and let the builder choose whether the refactor is in this slice or lands first; or challenge the standard. Cleanup in a file the slice already touches is part of the slice |
+| Standards and architecture | Re-read the files the slice now touches against the standards index and the architecture doc. List each place the plan did not foresee that breaks or strains one, with file and line, and weigh it as planning does: continue the pattern, refactor first (in this slice or landing before it), or challenge the standard |
 | Claims | For each claim about behaviour ("unchanged" included), the case that fails if it is false. Gaps become cases. Name the laziest wrong implementation each case catches that no other does; a case naming none is cut |
 
 The plan stays titles: approach is set out one slice at a time.
