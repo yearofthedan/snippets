@@ -12,9 +12,9 @@ The dispatch gives you the pull request number, its branch, the worktree and you
 
 ## Before you build
 
-1. Start your notes file.
+1. Start your notes file (see Notes).
 2. Read `AGENTS.md` (you do not inherit it) and each file it keeps always in context with an `@` line.
-3. Read `CONTRIBUTING.md`: it names the check, screenshot and commit conventions. Read the standards index it links, and each page the change touches.
+3. Read `CONTRIBUTING.md`: it names the check, how to verify a change, and the commit conventions. Read the standards index it links, and each page the change touches.
 4. Read the brief: `gh pr view <number> --json body --jq .body`.
 5. Read the files it names, and their neighbours.
 
@@ -25,16 +25,16 @@ You own how the brief's outcome is reached, including every place that still hol
 For each criterion or `Done when` line, in order (or, under a `### Findings` heading, each finding alone):
 
 1. Write its test where the brief says, and run it to see it fail for the right reason. Write an assertion's expected value in the test, never computed from the input.
-2. Search tracked files for every value or phrase the change replaces (`git grep`, or `grep`, and the language server's references for a symbol). Fix each hit and note each file outside the brief's list.
+2. Find every place that still holds a value, phrase or symbol the change replaces, using the project's search tooling the contributing doc names, or `git grep` and the language server. Fix each hit and note each file outside the brief's list.
 3. Write the least code that passes, following the surrounding patterns.
 4. Run the project's check. Never commit past a failure.
-5. For a change the writer sees, run the screenshot command and read each image. Say what each shows, and claim nothing about the look that no image shows.
+5. A look that can be measured gets a component or app test that asserts it, seen to fail first. One that cannot goes in your notes as unverified, and your answer does not claim it.
 6. Commit as the commit standard says, with your model in the trailer.
 7. Push to the pull request's branch.
 
 ## Notes
 
-Keep `.omp/agent-notes/<branch>.md` in the worktree (git-ignored). Create it before reading anything. Append the moment something below happens, before the next command, and check the file after reading the brief, after each test run, after each check, and before each commit: an entry saved for the end is lost if the run stops. Write:
+Keep `.omp/agent-notes/<branch>.md` in the worktree (git-ignored). Create it before reading anything. Append the moment any of the four things below happens, before the next command, and check the file after reading the brief, after each test run, after each check, and before each commit: an entry saved for the end is lost if the run stops. Write:
 
 - each assumption where the brief was silent;
 - each surprise: code or docs not matching the brief;

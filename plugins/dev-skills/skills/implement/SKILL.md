@@ -9,14 +9,14 @@ Work comes from an issue labelled `ready`: the builder's agreement, made after r
 
 ## What the project supplies
 
-- **Contributing doc** (default `CONTRIBUTING.md`): the check command, the screenshot command, the ready command, the commit and title standard, the standards index and the pull request template.
+- **Contributing doc** (default `CONTRIBUTING.md`): the check command, how to verify a change, the ready command, the commit and title standard, the standards index and the pull request template.
 - **Docs to read before planning**: the architecture doc, the decision records, the glossary.
 - **Notes folder** `.omp/agent-notes/`, which the project git-ignores.
 
 ## Gates
 
 - No issue number and no open pull request in the conversation: ask which issue. Never infer one from the branch, the last commit or earlier conversation.
-- No `ready` label: say the builder agrees by adding it, and stop. Never add it yourself.
+- No `ready` label: say the builder agrees by adding it, and stop. Add the label only with the builder's consent.
 
 ## Plan the slices
 
@@ -24,21 +24,11 @@ An issue with no plan comment gets a plan before any code.
 
 1. Read the issue, its epic, the architecture doc and the decision records it touches.
 2. List the open questions whose answer changes which slices there are, what they hold, or what one must decide: what a tool, library or the platform does, or whether an approach works here. Probe each outside the working tree: current docs linked beside the finding, or a short run in a temporary directory or scratch clone. Keep a run's output as it came out and post it on the issue in its own comment before anything cites a number from it; the plan, record or pull request body links that comment. A question no probe settles is listed as open. A probe that becomes code the story ships (a harness, fixture or script) stops, and that code becomes an enabling slice. No open questions: say so.
-3. Cut the slices. Each is thin, stands on its own and ends in something the builder can check. Enabling slices come first. Prefer slices that need only `main`, so one can start while another is in review.
+3. Cut the slices. Each is thin, stands on its own and ends in something the builder can check. Enabling slices come first, including a preparatory refactor where the files a slice touches strain the standards or the architecture. Prefer slices that need only `main`, so one can start while another is in review.
 4. Propose them, numbered, each an imperative phrase that becomes the pull request title. Add each open question: what was probed, what it showed, what is still open, which slices rest on it.
 5. Post nothing until the builder confirms. Then post each probe output, then the slices as a checklist comment with the open questions and findings beneath it, and start the first unstarted one.
 
 Tick a slice off as its pull request merges. The last unticked slice's pull request closes the issue.
-
-## Start a slice
-
-- Branch from an up-to-date `main` in a worktree of its own, named as the commit standard says (the issue number leads), with the slice's title in kebab-case: `git worktree add ../<branch> -b <branch> origin/main`, removed with `git worktree remove` once the slice merges. Two slices of one issue can be open at once, so name it for the slice. The main worktree is the builder's, so never switch its branch. A slice that needs another's unmerged work branches from that branch and retargets to `main` when it merges; this is the exception.
-- Set the worktree up as the contributing doc says, so its git hooks run.
-- Confirm the approach (next section). Commit nothing before the builder says yes.
-- Make the first commit empty, its subject the pull request title, and push.
-- Open a draft pull request from the template, `Part of #N` at the top. Fill `Brief` for an agent that saw none of the conversation: the criteria the slice covers, the confirmed approach, the files it starts from, the interface it changes, where each test lands. The last slice says `Closes #N`.
-- Dispatch the `execution-agent`: its task names the pull request number, branch, the worktree's absolute path and the model it runs as. A brief across several areas goes in batches, one area each, reading the notes and commits before the next.
-- Keep the criteria table current: a row per criterion and edge, its test or link, and where it ran.
 
 ## Confirm the approach
 
@@ -55,10 +45,21 @@ Before a slice's first commit, send the builder one message with each class belo
 | What the writer sees | Copy, interaction and layout, worked out as designing-ux says and shown from the repo's built app with the change applied in a scratch clone, never a standalone mock. Serve it; give the address and what to try |
 | Stored data | Its shape, and what happens to data already saved |
 | Test strategy | The level of each case, what is faked, the file each lands in |
-| Standards | Read every file the change touches against the standards index; list each place it breaks one, with file and line. For each place the change would copy, propose a preparatory refactor (the builder chooses whether it is in this slice or lands first) or challenge the standard. File the rest as issues |
+| Standards and architecture | Read every file the change touches against the standards index and the architecture doc; list each place it breaks or strains one, with file and line. For each place the change would copy or build on, weigh continuing the pattern against refactoring first, as weighing-options says, and let the builder choose whether the refactor is in this slice or lands first; or challenge the standard. Cleanup in a file the slice already touches is part of the slice |
 | Claims | For each claim about behaviour ("unchanged" included), the case that fails if it is false. Gaps become cases. Name the laziest wrong implementation each case catches that no other does; a case naming none is cut |
 
 The plan stays titles: approach is set out one slice at a time.
+
+## Start a slice
+
+Start once the builder has said yes to the approach.
+
+- Branch from an up-to-date `main` in a worktree of its own, named as the commit standard says, with the slice's title in kebab-case: `git worktree add ../<branch> -b <branch> origin/main`, removed with `git worktree remove` once the slice merges. Two slices of one issue can be open at once, so name it for the slice. The main worktree is the builder's, so never switch its branch. A slice that needs another's unmerged work branches from that branch and retargets to `main` when it merges; this is the exception.
+- Set the worktree up as the contributing doc says, so its git hooks run.
+- Make the first commit empty, its subject the pull request title, and push.
+- Open a draft pull request from the template, `Part of #N` at the top. Fill `Brief` for an agent that saw none of the conversation: the criteria the slice covers, the confirmed approach, the files it starts from, the interface it changes, where each test lands. The last slice says `Closes #N`.
+- Dispatch the `execution-agent`: its task names the pull request number, branch, the worktree's absolute path and the model it runs as. A brief across several areas goes in batches, one area each, reading the notes and commits before the next.
+- Keep the criteria table current: a row per criterion and edge, its test or link, and where it ran.
 
 ## When the execution agent returns
 
@@ -66,7 +67,8 @@ Read its notes (`.omp/agent-notes/<branch>.md` in the worktree) and its answer, 
 
 - put each assumption and change of approach in `Decisions`; one the builder has not confirmed goes to them first, through Confirm the approach, before anything builds on it;
 - put what would have saved time in `Learned`;
-- draft each find outside scope as an issue and file it on the builder's go;
+- draft each find outside scope as an issue and file it on the builder's go; batch one-line finds into one issue;
+- verify the change as the contributing doc says, before dispatching again or handing over: a problem goes back to the execution agent as a `### Findings` item in the `Brief`;
 - take a stop to the builder in a message of its own before dispatching again.
 
 ## Resume
@@ -79,16 +81,16 @@ The main session runs every step. Dispatch the execution agent only for a findin
 
 1. **Review** the whole diff against `main`, not the last commit, as the `reviewer` agent. Give it the range, the brief below and nothing else: no finding you already have, no suspected part, no summary. The reviewer's instructions hold the rest.
 
-   > Review this pull request's change, not the story behind it. Does the diff do what the body says? Do the body's claims hold against the tree? Do its links resolve? Does its prose break a rule the repository sets itself? Start from the standards index. Findings only, strongest first, each with file and line, no summary. A story-level gap is an aside, not a finding. Check every claim about how a tool, library or platform behaves against the link or run beside it, and read that source yourself: a claim with neither is a finding, and so is a test stub that differs from the tool it stands in for. A new or changed decision record that fails a writing-adrs test is a finding naming the test. Where the body says `Closes #N`, audit the story too: every criterion and edge against the evidence across the plan's pull requests, the plan comment against what merged, and every call the story left open.
-2. **Fix each finding**, or record in `Decisions` why it stays. Fix yourself what you can make and check in minutes, with absolute paths under the worktree. Longer ones go to the execution agent: add under `### Findings` in the `Brief` and dispatch again. Mark a finding fixed only with the file and line you read after the fix. Then review the fixes alone, from the commit the first review started at, and fix what it finds. Send the small improvements left to the builder as one list in one message, each with whether it is worth a commit: a pull request past review changes only when something is wrong.
+   > Review this pull request's change, not the story behind it. Did we build the right thing, and did we build it right? Judge as the domain would and as an application in the domain would. Does the diff do what the body says? Do the body's claims hold against the tree? Does its prose break a rule the repository sets itself? Start from the standards index. Findings only, strongest first, each with file and line, no summary. A story-level gap is an aside, not a finding. Check every claim about how a tool, library or platform behaves against the link or run beside it, and read that source yourself: a claim with neither is a finding, and so is a test stub that differs from the tool it stands in for. A new or changed decision record that fails a writing-adrs test is a finding naming the test. Where the body says `Closes #N`, audit the story too: every criterion and edge against the evidence across the plan's pull requests, the plan comment against what merged, and every call the story left open.
+2. **Fix each finding**, or record in `Decisions` why it stays. Fix yourself what you can make and check in minutes, with absolute paths under the worktree. Longer ones go to the execution agent: add under `### Findings` in the `Brief` and dispatch again. Mark a finding fixed only with the file and line you read after the fix. Then review the fixes alone, from the commit the first review started at, and fix what it finds. A small improvement in a file the slice touched is made in the slice and noted in `Decisions`; one that strains a pattern the slice builds on belonged in a preparatory slice.
 3. **Fill `Learned`**, capturing each lesson as an incident (lessons skill).
 4. **Fill the criteria table** and the `For review` list.
-5. **Fill `How to verify`** and give it in the conversation. For a change the writer sees, walk the steps yourself first in the built app and write what you saw, not what you expected.
+5. **Fill `How to verify`** and give it in the conversation. Verify as the contributing doc says first, and write what you saw, not what you expected.
 6. **Mark ready** with the project's ready command, and fix each condition it names. A push resets the claim: before any status report on a pushed pull request, run its check form. Before the builder merges, say what is still open, such as a review not back or a check not re-run since the last push.
 
 ## Work found outside the issue
 
-Never build it here. Draft the bug, story or task in its template, show the builder, file it without `ready` once they confirm, name it in `Decisions`.
+Never build it here. Draft the bug, story or task in its template, show the builder, file it without `ready` once they confirm, name it in `Decisions`. Batch one-line finds into one issue.
 
 ## Build rules
 
