@@ -62,6 +62,8 @@ Skills load when a task calls for them:
 
 - [`designing-ux`](./plugins/dev-skills/skills/designing-ux/SKILL.md) — works out and shows the user's experience:
   the job and path, every state, waiting and motion, recovery from mistakes, and the keyboard and assistive-tech path
+- [`implement`](./plugins/dev-skills/skills/implement/SKILL.md) — takes a `ready` issue through planned slices, one
+  pull request each: probe the open questions, confirm the approach, dispatch the execution agent, review, hand over
 - [`lessons`](./plugins/dev-skills/skills/lessons/SKILL.md) — captures an incident when the builder corrects,
   steers or interrupts the work, and assesses incidents into lessons with tripwires that stop them
 - [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
@@ -73,6 +75,11 @@ Skills load when a task calls for them:
   and writes or supersedes one
 - [`writing-docs`](./plugins/dev-skills/skills/writing-docs/SKILL.md) — how a doc page opens, which kind of doc
   content belongs in, and keeping a page on one subject
+
+Agents the plugin supplies for the task tool:
+
+- [`execution-agent`](./plugins/dev-skills/agents/execution-agent.md) — builds one slice from its pull request's
+  brief: test first, least code, the project's check, notes kept as it goes, and a stop when the brief does not hold
 
 Extensions run in every omp session, declared in the plugin's [`package.json`](./plugins/dev-skills/package.json):
 
