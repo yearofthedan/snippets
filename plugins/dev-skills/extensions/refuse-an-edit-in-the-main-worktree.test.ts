@@ -69,7 +69,7 @@ const reasonFor = (event: Call, session: Session): string =>
 const { main, linked } = repository();
 const outside = join(mkdtempSync(join(tmpdir(), 'not-a-repository-')), 'notes.md');
 
-describe('an edit or a write in a subagent', () => {
+describe('an edit or a write', () => {
   const mainCases: [what: string, call: Call, cwd: string, named: string][] = [
     ['a relative write in the main worktree', aWrite('notes.txt'), main, join(main, 'notes.txt')],
     [
@@ -179,8 +179,8 @@ describe('an edit or a write in a subagent', () => {
   });
 
   for (const [what, event, cwd] of mainCases) {
-    it(`passes ${what} from the main session`, () => {
-      assert.equal(refused(event, { cwd, agent: mainSession }), false);
+    it(`refuses ${what} from the main session too`, () => {
+      assert.equal(refused(event, { cwd, agent: mainSession }), true);
     });
   }
 
@@ -213,7 +213,7 @@ const aShellWrite = (command: string, cwd: string): Call => ({
   input: { command, cwd },
 });
 
-describe('a shell write in a subagent', () => {
+describe('a shell write', () => {
   const writesIntoTheMainWorktree: [what: string, command: string][] = [
     ['a redirect', 'echo hi > notes.txt'],
     ['an append', 'echo hi >> notes.txt'],
@@ -283,8 +283,8 @@ describe('a shell write in a subagent', () => {
   }
 
   for (const [, command] of writesIntoTheMainWorktree) {
-    it(`passes ${command} from the main session`, () => {
-      assert.equal(refused(aShellWrite(command, main), { cwd: main, agent: mainSession }), false);
+    it(`refuses ${command} from the main session too`, () => {
+      assert.equal(refused(aShellWrite(command, main), { cwd: main, agent: mainSession }), true);
     });
   }
 

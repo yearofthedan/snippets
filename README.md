@@ -89,7 +89,7 @@ Extensions run in every omp session, declared in the plugin's [`package.json`](.
   unchanged. At session start, it says when incidents are waiting to be assessed. The record stays on the machine,
   in `lessons/` under the agent directory.
 - [`refuse-an-edit-in-the-main-worktree`](./plugins/dev-skills/extensions/refuse-an-edit-in-the-main-worktree.ts) —
-  refuses a subagent's edit, write or shell write to a tracked file in the main worktree, which the builder and other
+  refuses an edit, write or shell write from any session to a tracked file in the main worktree, which the builder and other
   sessions share
 - [`refuse-a-step-around-the-flow`](./plugins/dev-skills/extensions/refuse-a-step-around-the-flow.ts) — refuses a
   branch switch in the main worktree, a restore or checkout over uncommitted work, a force push, and a commit that
