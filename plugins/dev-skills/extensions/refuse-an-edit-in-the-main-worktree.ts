@@ -5,10 +5,7 @@ import { resolveCallCwd, callDirectory } from './lib/call-cwd.ts';
 import { UNRESOLVED, wordsPerCommand, writeTargetsPerCommand } from './lib/shell-words.ts';
 
 type ToolCall = { toolName: string; input: Record<string, unknown> };
-type Context = {
-  cwd: string;
-  agent?: { kind?: string };
-};
+type Context = { cwd: string };
 type ToolCallResult = { block: true; reason: string } | undefined;
 
 export type Extension = {
@@ -83,7 +80,6 @@ export default function refuseAnEditInTheMainWorktree(pi: Extension): void {
     const edits = event.toolName === 'edit' || event.toolName === 'write';
     const shells = event.toolName === 'bash';
     if (!edits && !shells) return undefined;
-    if (context.agent?.kind !== 'sub') return undefined;
     const cwd = callDirectory(event.input, context.cwd);
     const named = shells
       ? shellWriteTargets(event.input)
