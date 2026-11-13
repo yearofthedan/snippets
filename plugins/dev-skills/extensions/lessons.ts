@@ -26,6 +26,12 @@ export const inboxReminder = (inboxText: string, now: Date): string | undefined 
   return `${dates.length} lesson incidents are waiting, the oldest from ${oldest}: run /skill:lessons to assess them.`;
 };
 
+export const captureTest = (skillText: string): string => {
+  const test = /^### When to capture\n+([\s\S]*?)\n+#/m.exec(skillText)?.[1];
+  if (test === undefined) throw new Error('skills/lessons/SKILL.md has no "### When to capture" section');
+  return test;
+};
+
 export default function lessons(pi: Extension): void {
   /* shortcut: a named profile (`omp --profile`) keeps its agent directory elsewhere, so its sessions read and point
      at the default one; resolve the active directory once a profile is used for real work. */
@@ -36,7 +42,7 @@ export default function lessons(pi: Extension): void {
     content: [
       {
         type: 'text',
-        text: `<system-reminder>If the builder's latest message corrects or contradicts your earlier work and you have not captured it yet, capture an incident in \`${inbox}\` as skill://lessons says before you reply. Otherwise, say nothing about this reminder.</system-reminder>`,
+        text: `<system-reminder>${captureTest(readFileSync(join(import.meta.dirname, '..', 'skills', 'lessons', 'SKILL.md'), 'utf8'))} Write it to \`${inbox}\` as skill://lessons says. Otherwise, say nothing about this reminder.</system-reminder>`,
       },
     ],
   };

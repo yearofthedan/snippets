@@ -1,6 +1,6 @@
 ---
 name: lessons
-description: Capture an incident when the builder corrects, steers or interrupts your work, and assess the captured incidents into lessons with tripwires that stop them. Use when a correction lands, including one phrased as a question or an aside, or when the builder asks to assess lessons.
+description: Capture an incident when the builder stops, redirects or undoes your work, a claim is shown wrong, or you step around a refusal; assess incidents into lessons with tripwires that stop them. Use when one of those happens, or when the builder asks to assess lessons.
 ---
 
 # Lessons
@@ -16,18 +16,22 @@ Create either file when it is missing.
 
 ## Capture
 
-Capture when the builder corrects your work, steers it, or interrupts it, when a review finds something you claimed was done, and when a hook refuses a step. Capture straight away, before replying, rather than at hand-over: the detail is gone by then. A correction often arrives as a question ("is a 100 ms cap too strict?") or an aside ("worth noting that AA is a baseline"): it counts when your reply would concede the point. A message that only adds information is not an incident.
+### When to capture
 
-Append one entry per incident to `inbox.md`:
+Capture before you reply when the builder stopped, redirected or undid something you did; when something you stated as checked, done or decided is shown wrong, by them or by a review; or when you stepped around a refusal instead of doing what it names. Questions, requests for more information, or changes to proposals are not incidents by themselves, although they could reveal one.
+
+### The entry
+
+Append one entry per incident to `inbox.md`. Record what happened, not why: the assessment finds the cause and the tripwire by comparing incidents.
 
 ```markdown
 ## YYYY-MM-DD · <repo> · <pull request, issue or session id>
-- **What happened:** one line, the facts.
-- **Cost:** what it touched or exposed, whether anything unverified shipped, how many steers it took, the rework.
-- **Would have caught it:** the check, rule or habit that would have stopped it sooner.
+- **What happened:** in order: what you claimed or did, quoted; what the builder, a review or a refusal said, word for word; what you did next.
+- **Impact:** who caught it, how far it got (inside the session, to the builder, into a pull request, into their work), and the rework.
+- **Session:** the session file and a short quote from the message, so the assessment can read the context.
 ```
 
-Record the cost as facts. Severity is set when the incident is assessed, not by the session that caused it.
+Record the impact as facts. Severity is set when the incident is assessed, not by the session that caused it.
 
 ## Assess
 

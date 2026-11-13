@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import lessons, { type ContextResult, type Extension, type Message, inboxReminder } from './lessons.ts';
+import { readFileSync } from 'node:fs';
+import lessons, { type ContextResult, type Extension, type Message, captureTest, inboxReminder } from './lessons.ts';
 
 type Handler = (event: { messages: Message[] }, context: { agent: { kind: string } }) => unknown;
 
@@ -25,6 +26,18 @@ describe('the capture note', () => {
     assert.deepEqual(result?.messages.slice(0, messages.length), messages);
     assert.equal(result?.messages.length, messages.length + 1);
     assert.match(JSON.stringify(result?.messages.at(-1)), /^\{"role":"user".*<system-reminder>.*lessons\/inbox\.md.*<\/system-reminder>/);
+  });
+
+  it("carries the skill's When to capture test, and nothing past it", () => {
+    const note = JSON.stringify(contextHandler()([{ role: 'user', content: text('build it') }])?.messages.at(-1));
+    assert.match(note, /Capture before you reply when the builder stopped/);
+    assert.match(note, /although they could reveal one\. Write it to/);
+    assert.doesNotMatch(note, /### The entry/);
+  });
+
+  it('refuses to load when the skill has lost its When to capture section', () => {
+    const skill = readFileSync(new URL('../skills/lessons/SKILL.md', import.meta.url), 'utf8');
+    assert.throws(() => captureTest(skill.replace('### When to capture', '### Triggers')), /When to capture/);
   });
 
   it('leaves the conversation it was given unchanged', () => {
