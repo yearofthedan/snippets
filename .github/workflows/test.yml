@@ -14,3 +14,11 @@ jobs:
         with:
           node-version: 26
       - run: node --test 'plugins/dev-skills/extensions/*.test.ts' 'plugins/dev-skills/skills/*/*.test.ts'
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - run: node --test setup.test.ts

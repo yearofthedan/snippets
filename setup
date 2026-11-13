@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+if ! command -v omp >/dev/null 2>&1; then
+  echo "omp is not on your PATH. Install OMP, then run ./setup again." >&2
+  exit 1
+fi
+
+changed=
+
+plugin() {
+  name=$1
+  id=$2
+  marketplace=$3
+  source=$4
+  if omp plugin marketplace list | grep -qF "$source"; then
+    omp plugin marketplace update "$marketplace"
+  else
+    omp plugin marketplace add "$source"
+  fi
+  if ! omp plugin list --json | grep -qF "\"$id\""; then
+    omp plugin install "$id"
+    echo "Installed $name."
+    changed=1
+    return 0
+  fi
+  outdated=$(omp plugin upgrade --dry-run | grep -F " $id (" | head -n 1 || true)
+  if [ -z "$outdated" ]; then
+    echo "$name is up to date."
+    return 0
+  fi
+  omp plugin upgrade "$id"
+  echo "Upgraded $name: ${outdated##*: }."
+  changed=1
+}
+
+plugin Ponytail ponytail@ponytail ponytail DietrichGebert/ponytail
+plugin dev-skills dev-skills@snippets snippets yearofthedan/snippets
+if [ -n "$changed" ]; then
+  echo "Start a new OMP session to load the changes."
+fi
