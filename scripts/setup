@@ -1,8 +1,9 @@
 #!/bin/sh
+# help: Install Ponytail and dev-skills into omp, or upgrade whichever is behind.
 set -eu
 
 if ! command -v omp >/dev/null 2>&1; then
-  echo "omp is not on your PATH. Install OMP, then run ./setup again." >&2
+  echo "omp is not on your PATH. Install OMP, then run ./do setup again." >&2
   exit 1
 fi
 

@@ -34,12 +34,12 @@ transcripts on this machine. The transcripts and everything extracted from them 
 A plugin of development rules and skills, published from this repo's marketplace
 ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)).
 
-[`setup`](./setup) sets up the harness on a machine: it installs Ponytail and dev-skills into omp, or, where they
-are installed, refreshes their marketplaces and upgrades whichever is behind. Run it from a clone with `./setup`, or
-without one:
+`./do setup` sets up the harness on a machine: it installs Ponytail and dev-skills into omp, or, where they are
+installed, refreshes their marketplaces and upgrades whichever is behind. `./do` alone lists the tasks. Without a
+clone:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/yearofthedan/snippets/main/setup | sh
+curl -fsSL https://raw.githubusercontent.com/yearofthedan/snippets/main/scripts/setup | sh
 ```
 
 Run it again to update. After it installs or upgrades anything, start a new omp session: hooks and extensions load

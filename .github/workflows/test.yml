@@ -21,4 +21,4 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 26
-      - run: node --test setup.test.ts
+      - run: node --test scripts/setup.test.ts
