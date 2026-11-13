@@ -1,6 +1,6 @@
 {
   "name": "dev-skills",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "omp": {
@@ -11,6 +11,7 @@
       "./extensions/refuse-a-direct-add.ts",
       "./extensions/refuse-a-server-in-the-shell.ts",
       "./extensions/refuse-an-edit-before-an-answer.ts",
+      "./extensions/weigh-options-when-asked.ts",
       "./extensions/cache-guard.ts"
     ]
   },
