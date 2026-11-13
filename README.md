@@ -64,8 +64,9 @@ Skills load when a task calls for them:
   the job and path, every state, waiting and motion, recovery from mistakes, and the keyboard and assistive-tech path
 - [`implement`](./plugins/dev-skills/skills/implement/SKILL.md) — takes a `ready` issue through planned slices, one
   pull request each: probe the open questions, confirm the approach, dispatch the execution agent, review, hand over
-- [`lessons`](./plugins/dev-skills/skills/lessons/SKILL.md) — captures an incident when the builder corrects,
-  steers or interrupts the work, and assesses incidents into lessons with tripwires that stop them
+- [`lessons`](./plugins/dev-skills/skills/lessons/SKILL.md) — captures an incident when the builder stops,
+  redirects or undoes the work, a claim is shown wrong, or a refusal is stepped around, and assesses incidents into
+  lessons with tripwires that stop them
 - [`mutation-triage`](./plugins/dev-skills/skills/mutation-triage/SKILL.md) — classifies surviving Stryker mutants
   and removes dead branches, records noise, or writes the tests that kill them
 - [`weighing-options`](./plugins/dev-skills/skills/weighing-options/SKILL.md) — puts options to the user on what
@@ -83,11 +84,11 @@ Agents the plugin supplies for the task tool:
 
 Extensions run in every omp session, declared in the plugin's [`package.json`](./plugins/dev-skills/package.json):
 
-- [`lessons`](./plugins/dev-skills/extensions/lessons.ts) — ends each request with a `<system-reminder>` asking the
-  main session to capture an incident first when the builder's latest message corrects its work. The reminder goes
-  in the request only, after everything else, so the saved session never holds it and the cached prefix is
-  unchanged. At session start, it says when incidents are waiting to be assessed. The record stays on the machine,
-  in `lessons/` under the agent directory.
+- [`lessons`](./plugins/dev-skills/extensions/lessons.ts) — ends each request with a `<system-reminder>` holding the
+  skill's "When to capture" test, read from `skills/lessons/SKILL.md`, so the main session captures an incident before
+  it replies. The reminder goes in the request only, after everything else, so the saved session never holds it and
+  the cached prefix is unchanged. At session start, it says when incidents are waiting to be assessed. The record
+  stays on the machine, in `lessons/` under the agent directory.
 - [`refuse-an-edit-in-the-main-worktree`](./plugins/dev-skills/extensions/refuse-an-edit-in-the-main-worktree.ts) —
   refuses an edit, write or shell write from any session to a tracked file in the main worktree, which the builder and other
   sessions share
