@@ -163,69 +163,30 @@ describe('a git restore or checkout', () => {
 
 describe('a git push', () => {
   const clean = repository();
-  const onMain = repository({ branch: 'main' });
-  const onASpike = repository({ branch: 'spike' });
-  const detached = repository();
-  execFileSync('git', ['-C', detached, 'checkout', '-q', '--detach']);
-
-  for (const [command, cwd] of [
-    ['git push', onMain],
-    ['git push', onASpike],
-    ['git push origin main', clean],
-    ['git push origin 74-another-line', clean],
-    ['git push --force', clean],
-    ['git push -f origin 73-fix-a-dodgy-restore', clean],
-    ['git push --force-with-lease', clean],
-    ['git push origin +73-fix-a-dodgy-restore', clean],
-    ['git push --delete origin 73-fix-a-dodgy-restore', clean],
-    ['git push --all', clean],
-    ['git push --mirror', clean],
-    ['git push --tags', clean],
-    ['git push', detached],
-    ['echo hi > "" ; git push --force origin main', clean],
-    ['git push 2>/dev/null --force origin main', clean],
-    ['GIT_TRACE=1 git push --force origin main', clean],
-    ['git push \\\n--force', clean],
-    ['command git push --force origin main', clean],
-    ['builtin git push --force origin main', clean],
-    ['exec git push --force origin main', clean],
-  ] as [string, string][]) {
-    it(`refuses ${command}`, () => {
-      assert.equal(refused(command, cwd), true);
-    });
-  }
-
-  for (const [command, wanted] of [
-    ['git push origin main', 'main'],
-    ['git push --delete origin 73-fix-a-dodgy-restore', 'removal is the builder'],
-  ] as const) {
-    it(`says why, for ${command}`, () => {
-      assert.ok(reasonFor(command, clean).includes(wanted));
-    });
-  }
-
-  for (const [command, cwd] of [
-    ['git push', clean],
-    ['git push -u origin HEAD', clean],
-    ['git push origin 73-fix-a-dodgy-restore', clean],
-    ['git commit -m "stop: git push --force blocked"', clean],
-    ['command git push -u origin HEAD', clean],
-    ['builtin git push -u origin HEAD', clean],
-    ['exec git push -u origin HEAD', clean],
-  ] as [string, string][]) {
-    it(`passes ${command}`, () => {
-      assert.equal(refused(command, cwd), false);
-    });
-  }
 
   for (const command of [
-    'git push -u origin HEAD 2>&1',
-    'git push -u origin HEAD 2>&1 | tail -3',
-    `git -C ${clean} push -u origin HEAD 2>&1 | tail -3`,
-    'git push -u origin HEAD > "a log file"',
-    'git push --force-if-includes',
+    'git push --no-verify',
+    'git push --no-veri origin 73-fix-a-dodgy-restore',
+    'command git push --no-verify origin main',
+    'git push -u origin HEAD --no-verify 2>&1 | tail -3',
   ]) {
-    it(`passes ${command}`, () => {
+    it(`refuses ${command}`, () => {
+      assert.equal(refused(command, clean), true);
+    });
+  }
+
+  it('says the hook is what it skips', () => {
+    assert.ok(reasonFor('git push --no-verify', clean).includes('pre-push hook'));
+  });
+
+  for (const command of [
+    'git push',
+    'git push origin main',
+    'git push --force',
+    'git push -n origin main',
+    'git push origin -- --no-verify',
+  ]) {
+    it(`leaves ${command} to the repository's own hook`, () => {
       assert.equal(refused(command, clean), false);
     });
   }
@@ -236,22 +197,22 @@ describe('the directory the call runs in', () => {
   const linked = `${main}-linked`;
   execFileSync('git', ['-C', main, 'worktree', 'add', '-q', linked, '-b', '73-a-linked-line']);
 
-  it('passes a push from the worktree the call names, not the session', () => {
-    assert.equal(refused('git push -u origin HEAD', main, linked), false);
+  it('passes a branch switch in the worktree the call names, not the session', () => {
+    assert.equal(refused('git switch -c 74-a-new-line', main, linked), false);
   });
 
-  it('refuses a push on the branch of the worktree the call names', () => {
-    assert.equal(refused('git push -u origin HEAD', linked, main), true);
+  it('refuses a branch switch in the main worktree the call names', () => {
+    assert.equal(refused('git switch -c 74-a-new-line', linked, main), true);
   });
 
-  it('reads a push after cd against the worktree the cd names', () => {
-    assert.equal(refused(`cd ${linked} && git push -u origin HEAD`, main), false);
-    assert.equal(refused(`cd ${main} && git push -u origin HEAD`, linked), true);
+  it('reads a switch after cd against the worktree the cd names', () => {
+    assert.equal(refused(`cd ${linked} && git switch -c 74-a-new-line`, main), false);
+    assert.equal(refused(`cd ${main} && git switch -c 74-a-new-line`, linked), true);
   });
 
   it('resolves a relative cd against the directory the call runs in', () => {
-    assert.equal(refused(`cd ${basename(linked)} && git push -u origin HEAD`, dirname(linked)), false);
-    assert.equal(refused(`cd ${basename(main)} && git push -u origin HEAD`, dirname(main)), true);
+    assert.equal(refused(`cd ${basename(linked)} && git switch -c 74-a-new-line`, dirname(linked)), false);
+    assert.equal(refused(`cd ${basename(main)} && git switch -c 74-a-new-line`, dirname(main)), true);
   });
 });
 
@@ -425,14 +386,6 @@ describe('the tooling gates', () => {
     assert.equal(refused('gh pr ready 77', repository()), true);
     assert.equal(refused('gh pr ready 77', repository({ tasks: ['check'] })), false);
     assert.equal(refused('gh pr ready 77', repository({ tasks: false })), false);
-  });
-
-  it('files the story-branch push rule only where ./do exists', () => {
-    const onMain = repository({ branch: 'main', tasks: false });
-    assert.equal(refused('git push', onMain), false);
-    assert.equal(refused('git push origin main', onMain), false);
-    const onABranch = repository({ branch: 'spike', tasks: false });
-    assert.equal(refused('git push origin spike', onABranch), false);
   });
 
   it('names ./do check only where the repository has it', () => {

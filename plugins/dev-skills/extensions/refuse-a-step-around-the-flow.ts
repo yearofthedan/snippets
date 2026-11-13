@@ -15,8 +15,6 @@ export type Extension = {
   ): void;
 };
 
-const STORY_BRANCH = /^[0-9]+-/;
-
 const GIT_OPTIONS_THAT_TAKE_A_VALUE: Record<string, true> = {
   '-c': true,
   '--config-env': true,
@@ -25,23 +23,6 @@ const GIT_OPTIONS_THAT_TAKE_A_VALUE: Record<string, true> = {
   '--namespace': true,
   '--exec-path': true,
 };
-const PUSH_OPTIONS_THAT_TAKE_A_VALUE: Record<string, true> = {
-  '-o': true,
-  '--push-option': true,
-  '--repo': true,
-  '--receive-pack': true,
-  '--exec': true,
-};
-const FORCE_FLAGS: Record<string, true> = {
-  '--force': true,
-  '--force-with-lease': true,
-};
-const PUSHES_OTHER_REFS: Record<string, true> = {
-  '--all': true,
-  '--mirror': true,
-  '--tags': true,
-};
-const REMOVES_A_REF: Record<string, true> = { '--delete': true, '-d': true };
 
 const git = (cwd: string, args: string[]): { failed: boolean; out: string } => {
   const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' });
@@ -66,12 +47,6 @@ const repositoryRoot = (cwd: string): string | undefined => {
 /* shortcut: the gate reads working-title's `./do` wrapper and `scripts/` task layout; read another layout if a repo with a different task runner adopts this extension. */
 const hasDoTask = (root: string, task: string): boolean =>
   executable(join(root, 'do')) && executable(join(root, 'scripts', task));
-
-const currentBranch = (cwd: string): string | undefined => {
-  const branch = git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  const name = branch.out.trim();
-  return branch.failed || name === '' || name === 'HEAD' ? undefined : name;
-};
 
 const gitInvocation = (
   words: string[],
@@ -176,7 +151,7 @@ const gitReason = (
     return switchRefusal(subcommand, args, cwd) ?? overwriteRefusal(subcommand, args, cwd);
   }
   if (subcommand === 'restore') return overwriteRefusal(subcommand, args, cwd);
-  if (subcommand === 'push') return pushRefusal(args, cwd, repositoryRoot(cwd));
+  if (subcommand === 'push') return pushRefusal(args);
   if (subcommand === 'commit') {
     const root = repositoryRoot(cwd);
     const hasCheck = root !== undefined && hasDoTask(root, 'check');
@@ -187,59 +162,13 @@ const gitReason = (
   return undefined;
 };
 
-const targetOf = (refspec: string, current: string | undefined): string | undefined => {
-  const [source = '', destination] = refspec.replace(/^\+/, '').split(':');
-  const branch = (destination === undefined ? source : destination).replace(/^refs\/heads\//, '');
-  if (branch === '') return undefined;
-  return branch === 'HEAD' ? current : branch;
-};
-
-const pushRefusal = (args: string[], cwd: string, root: string | undefined): string | undefined => {
-  if (root === undefined || !executable(join(root, 'do'))) return undefined;
-  const positionals: string[] = [];
-  let forced = false;
-  let otherRefs = '';
-  let removal = '';
-  for (let index = 0; index < args.length; index += 1) {
-    const word = args[index] ?? '';
-    if (word === '--') {
-      positionals.push(...args.slice(index + 1));
-      break;
-    }
-    if (Object.hasOwn(PUSH_OPTIONS_THAT_TAKE_A_VALUE, word)) {
-      index += 1;
-      continue;
-    }
-    const flag = word.split('=')[0] ?? '';
-    if (Object.hasOwn(FORCE_FLAGS, flag)) forced = true;
-    if (Object.hasOwn(PUSHES_OTHER_REFS, flag)) otherRefs = flag;
-    if (Object.hasOwn(REMOVES_A_REF, flag)) removal = flag;
-    const short = word.startsWith('-') && !word.startsWith('--') ? word.slice(1) : '';
-    if (short !== '') {
-      if (short.includes('f')) forced = true;
-      if (short.includes('d')) removal = '-d';
-    }
-    if (word.startsWith(':')) removal = '--delete';
-    if (word.startsWith('+')) forced = true;
-    if (!word.startsWith('-')) positionals.push(word);
+const pushRefusal = (args: string[]): string | undefined => {
+  for (const word of args) {
+    if (word === '--') return undefined;
+    if (word.length >= '--no-veri'.length && '--no-verify'.startsWith(word))
+      return "A push runs the repository's pre-push hook: skipping it with `--no-verify` pushes what its rules would refuse. Do what the refusal names, or stop and ask the builder.";
   }
-  if (removal !== '') {
-    return `\`${removal}\` removes a ref on the remote. A push adds to the story branch; a removal is the builder's call.`;
-  }
-  if (otherRefs !== '') {
-    return `\`${otherRefs}\` moves refs beyond the story branch. A push carries the current branch alone.`;
-  }
-  if (forced) {
-    return "A push goes without force: rewriting what the remote carries is the builder's call, not a step to slip in.";
-  }
-  const current = currentBranch(cwd);
-  const asked = positionals.slice(1);
-  const targets = asked.length === 0 ? [current] : asked.map((it) => targetOf(it, current));
-  const elsewhere = targets.find((target) => target !== current);
-  if (current !== undefined && STORY_BRANCH.test(current) && elsewhere === undefined)
-    return undefined;
-  const would = targets[0] === undefined ? 'no branch' : `\`${targets[0]}\``;
-  return `A push goes only to the story branch, named \`<issue number>-…\`, without force. This one would push ${would}.`;
+  return undefined;
 };
 
 const COMMIT_OPTIONS_THAT_TAKE_A_VALUE: Record<string, true> = {
