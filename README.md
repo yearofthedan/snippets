@@ -93,9 +93,9 @@ Extensions run in every omp session, declared in the plugin's [`package.json`](.
   refuses an edit, write or shell write from any session to a tracked file in the main worktree, which the builder and other
   sessions share
 - [`refuse-a-step-around-the-flow`](./plugins/dev-skills/extensions/refuse-a-step-around-the-flow.ts) — refuses a
-  branch switch in the main worktree, a restore or checkout over uncommitted work, a force push, and a commit that
-  skips or lacks the pre-commit hook. Where the repo has a `./do` wrapper, a push goes only to the story branch
-  (`<issue number>-…`), and where `./do` has a `ready` task, `gh pr ready` goes through it.
+  branch switch in the main worktree, a restore or checkout over uncommitted work, a commit that skips or lacks the
+  pre-commit hook, and a push that skips the pre-push hook. Which pushes a repo accepts is its own pre-push hook's
+  call. Where `./do` has a `ready` task, `gh pr ready` goes through it.
 - [`refuse-a-direct-add`](./plugins/dev-skills/extensions/refuse-a-direct-add.ts) — where `./do` has an `add` task,
   refuses adding a dependency or running a package any other way
 - [`refuse-a-server-in-the-shell`](./plugins/dev-skills/extensions/refuse-a-server-in-the-shell.ts) — refuses a
