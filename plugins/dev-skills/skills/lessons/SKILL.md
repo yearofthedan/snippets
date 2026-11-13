@@ -73,4 +73,6 @@ For each, propose the smallest tripwire that would have stopped every incident i
 
 A tripwire lives with what it is about. One for a `practice` lesson goes in the dev-skills plugin, and one for a repository's lesson goes in that repository. When a tripwire that was in place did not stop an incident, propose a stronger kind, such as a check where a rule failed, rather than rewording the rule.
 
+Before setting a proposal out, test it against the incidents of its own lesson and of each lesson that pulls the other way, such as asking too little against deciding too much, or capturing too little against capturing too much. Say in one line which incidents it would stop, and which wanted behaviour it would wrongly stop.
+
 Set the proposals out to the builder in a message of their own, with the incidents behind each one. Mark a lesson's tripwire `proposed` once they agree, and link the tripwire once it lands.
