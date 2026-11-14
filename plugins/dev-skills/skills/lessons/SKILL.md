@@ -18,7 +18,7 @@ Create either file when it is missing.
 
 ### When to capture
 
-Capture before you reply when the builder stopped, redirected or undid something you did; when something you stated as checked, done or decided is shown wrong, by them or by a review; or when you stepped around a refusal instead of doing what it names. Questions, requests for more information, or changes to proposals are not incidents by themselves, although they could reveal one.
+Capture before you reply when the builder stopped, redirected or undid something you did; when something you stated as checked, done or decided is shown wrong by the builder, or by a review or an agent where it sent the work the wrong way or cost a run or a rework; or when you stepped around a refusal instead of doing what it names. A finding fixed in a line or two is the review doing its job, not an incident. Questions, requests for more information, or changes to proposals are not incidents by themselves, although they could reveal one.
 
 ### The entry
 
@@ -28,11 +28,11 @@ Append one entry per incident to `inbox.md`. Record what went wrong and what hap
 ## YYYY-MM-DD · <repo> · <pull request, issue or session id>
 - **What went wrong:** one plain sentence naming the mistake, as you would own it: "I left the door unlocked". No "because".
 - **What happened:** in order: what you claimed or did, quoted; what the builder, a review or a refusal said, word for word; what you did next.
-- **Impact:** who caught it, how far it got (inside the session, to the builder, into a pull request, into their work), and the rework.
+- **Impact:** who caught it, how far it got (inside the session, to the builder, into a pull request, into their work), the rework, and a rough estimate of what it wasted: agent run time, replies, or reworked commits; "unknown" for what you did not see.
 - **Session:** the session file and a short quote from the message, so the assessment can read the context.
 ```
 
-Record the impact as facts. Severity is set when the incident is assessed, not by the session that caused it.
+Record the impact as facts and the waste as an estimate. Severity is set when the incident is assessed, not by the session that caused it.
 
 ## Assess
 
