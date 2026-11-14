@@ -12,7 +12,7 @@ There is almost never a reason for a comment. Each reason to write one has a cou
 A comment is allowed only when it starts with one of these, after the comment marker:
 
 - `shortcut: <the limit>, <when to upgrade>`, for a known limit;
-- `workaround: <issue link>`, for code patching a bug in a library or the platform;
+- `workaround: <the tool and version, and what it omits or gets wrong>; remove when <what to check>`, for code patching a gap or a bug in a library or the platform, with an issue link added where one exists;
 - a comment a tool reads: a directive such as `@ts-expect-error` or a lint disable, or text a tool prints, such as the summary a task runner shows beside each task.
 
 A `//` or `#` comment is one line; a longer one is a `/* … */` block.
