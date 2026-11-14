@@ -40,33 +40,21 @@ Status: Proposed, YYYY-MM-DD
 
 ## Context
 
-The question that had to be answered, in one sentence.
-
-- **Short name.** One force per bullet, stated as fact.
-
-## Options considered
-
-| Option | Force A | Force B |
-| --- | --- | --- |
-| Chosen option | How it fares | How it fares |
-| Other option | How it fares | How it fares |
-
 ## Decision
 
 ## Consequences
 ```
 
-- **Context** opens with the question in one sentence, then lists the forces at play, each with a short bold name the options table reuses as a column: constraints, quality targets, design principles, facts about the platform or the team, and the forces the decision goes against. Options go under Options considered, and the context doesn't argue for the outcome. A reader should see why a reasonable person could land elsewhere.
-- **Options considered** is a table: one row per real option, the chosen one first, one column per force. Each cell says in a few words how that option fares. A drawback with no force column is not a reason: if no column rules an option out, the context is missing a force or the option didn't lose. A record with only one row fails the first test.
-- **Decision** names the chosen option and what was decided, at the level that stays true while details change. No library names unless the decision is about that library and a change has proven it. It says which forces decided it and why each other option lost, in the table's terms; where the table favours another option on a force, it says what outweighs that force. A reader with only the record should reach the same choice.
-- **Consequences** states what follows, good and bad: what becomes easy, what becomes hard, what is now ruled out, and which checks enforce it.
+- **Context** describes the forces at play, such as constraints, quality targets, design principles and facts about the platform or the team, stated as facts in value-neutral language. It says where they pull against each other and names the alternatives a reasonable person could have chosen, without arguing for the outcome.
+- **Decision** is the response to those forces, in full sentences and the active voice: "We will …". It is stated at the level that stays true while details change: no library names unless the decision is about that library and a change has proven it.
+- **Consequences** describes the resulting context after applying the decision, positive, negative and neutral: what becomes easy, what becomes hard, and what is now ruled out.
+- The record is one or two pages, written as a conversation with a future developer: full sentences in paragraphs, with bullets only for visual style, never for sentence fragments.
 - Names no person and tells no story of how the decision was reached.
 
 ## After writing
 
 - Add a row to the index.
 - Link the record from the part of the architecture doc it explains, if the project keeps one.
-- Check the deciding force: each force the Decision says decided it favours the chosen option, in the table and in Consequences. Where either says that force favours another option, the record contradicts itself; resolve it before the record is done.
 - Re-read the record against the three tests and the table above. A record that fails one is deleted, not softened.
 
 ## Changing a decision
