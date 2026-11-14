@@ -22,10 +22,11 @@ Capture before you reply when the builder stopped, redirected or undid something
 
 ### The entry
 
-Append one entry per incident to `inbox.md`. Record what happened, not why: the assessment finds the cause and the tripwire by comparing incidents.
+Append one entry per incident to `inbox.md`. Record what went wrong and what happened, not why it went wrong: the assessment finds the cause and the tripwire by comparing incidents.
 
 ```markdown
 ## YYYY-MM-DD · <repo> · <pull request, issue or session id>
+- **What went wrong:** one plain sentence naming the mistake, as you would own it: "I left the door unlocked". No "because".
 - **What happened:** in order: what you claimed or did, quoted; what the builder, a review or a refusal said, word for word; what you did next.
 - **Impact:** who caught it, how far it got (inside the session, to the builder, into a pull request, into their work), and the rework.
 - **Session:** the session file and a short quote from the message, so the assessment can read the context.
