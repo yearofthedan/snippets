@@ -8,3 +8,5 @@ A claim is checked against the thing it is about, not a stand-in for it, before 
 For a tool, platform or library, the thing is its current docs, a run or the installed version. A search that finds nothing is not the docs. The types, the repo's own prose and a remembered API are not the platform either: they are where a wrong claim reads as checked.
 
 For this repository — what a file holds, which change touched it, what its rules say — the thing is the repo, read before the claim is made.
+
+A message that asks the builder to decide ends with a table of the claims it rests on: the claim, its source, and Checked or Unchecked. A source is a file and line, a link or a run's output read in this session, and it is the thing the claim is about, never a page that cites it. An outside source says in a few words what it is and how it bears on the claim. A claim with no such source reads Unchecked, and is never worded as fact.
