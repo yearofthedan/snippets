@@ -59,4 +59,4 @@ Status: Proposed, YYYY-MM-DD
 
 ## Changing a decision
 
-A record is Proposed until the change that proves it merges, and can be edited freely until then, even if the record itself merged earlier. The change that proves it sets it to `Accepted, YYYY-MM-DD`. An Accepted record is never edited. To change it, write a new record that supersedes it, set the old record's status to `Superseded by [N](NNNN-title.md)`, update the index, and repoint its links in the architecture doc.
+A record is Proposed until the change that proves it merges, and can be edited freely until then, even if the record itself merged earlier. The change that proves it sets it to `Accepted, YYYY-MM-DD`. An Accepted record's decision is never edited: a changed choice, driver or verdict on an option is a new record that supersedes it. Write it, set the old record's status to `Superseded by [N](NNNN-title.md)`, update the index, and repoint its links in the architecture doc. A line that has become false and that the decision does not rest on, such as a format detail or a link, is removed or corrected in place: it fails the three tests, and a record that fails one is deleted, not softened.
