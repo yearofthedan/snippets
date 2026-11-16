@@ -24,7 +24,7 @@ Everything else goes somewhere else:
 
 | It is… | It goes in |
 | --- | --- |
-| A product decision: what the user sees, can do, or is offered | The product docs or the issue, never an ADR |
+| A product decision: what the user sees, can do, or is offered | Never an ADR. One that passes the three tests above goes into the section of the product docs about its subject, written as how the product works and why, and rewritten when it changes. One that fails a test stays in its issue |
 | A choice not yet proven in use, such as a library before it has met the quality targets | The change that depends on it, which writes the record once it is proven |
 | A convention that is cheap to change (file names, folder names, test style) | The repo's agent instructions, or a lint rule |
 | A detail of how a decision is carried out (timings, syntax, port names) | The code, a check, or a doc beside it |
