@@ -291,6 +291,32 @@ describe('a branch switch', () => {
   });
 });
 
+describe('a worktree add', () => {
+  const { main } = repositoryToSwitchIn();
+
+  for (const command of ['git worktree add ../73-new -b 73-new main', 'git worktree add -B 73-new ../73-new main']) {
+    it(`refuses ${command}, which starts from local main`, () => {
+      assert.equal(refused(command, main), true);
+    });
+  }
+
+  it('names origin/main in the reason it gives', () => {
+    assert.ok(reasonFor('git worktree add ../73-new -b 73-new main', main).includes('origin/main'));
+  });
+
+  for (const command of [
+    'git worktree add ../73-new -b 73-new origin/main',
+    'git worktree add ../73-new -b 73-new 73-another-line',
+    'git worktree add ../73-another-line 73-another-line',
+    'git worktree add -b main ../main-copy origin/main',
+    'git worktree list',
+  ]) {
+    it(`passes ${command}`, () => {
+      assert.equal(refused(command, main), false);
+    });
+  }
+});
+
 describe('a git commit', () => {
   const clean = repository();
 

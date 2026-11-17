@@ -18,7 +18,7 @@ Create either file when it is missing.
 
 ### When to capture
 
-Answer the builder first, then capture in the same turn when they stopped, redirected or undid something you did; when something you stated as checked, done or decided is shown wrong by the builder, or by a review or an agent where it sent the work the wrong way or cost a run or a rework; or when you stepped around a refusal instead of doing what it names. A finding fixed in a line or two is the review doing its job, not an incident. Questions, requests for more information, or changes to proposals are not incidents by themselves, although they could reveal one.
+Answer the builder first, then capture in the same turn when they stopped, redirected or undid something you did; when something you stated as checked, done or decided is shown wrong by the builder, or by a review or an agent where it sent the work the wrong way or cost a run or a rework; or when you stepped around a refusal instead of doing what it names. A finding fixed in a line or two is the review doing its job, not an incident. A question, a request for more, a point the builder adds to a recommendation, or a change to a proposal is the conversation working, and is captured only when it shows that something already built, pushed or reported as checked was wrong.
 
 ### The entry
 

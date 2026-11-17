@@ -140,6 +140,20 @@ const switchRefusal = (subcommand: string, args: string[], cwd: string): string 
   return 'This is the main worktree, which the builder and other sessions share: a branch switch here moves their work. Do the work in a worktree of its own: `git worktree add ../<branch> -b <branch> origin/main`.';
 };
 
+const WORKTREE_ADD_OPTIONS_THAT_TAKE_A_VALUE: Record<string, true> = { '-b': true, '-B': true, '--reason': true };
+
+const staleStartRefusal = (args: string[]): string | undefined => {
+  if (args[0] !== 'add') return undefined;
+  const positionals: string[] = [];
+  for (let index = 1; index < args.length; index += 1) {
+    const word = args[index] ?? '';
+    if (Object.hasOwn(WORKTREE_ADD_OPTIONS_THAT_TAKE_A_VALUE, word)) index += 1;
+    else if (!word.startsWith('-')) positionals.push(word);
+  }
+  if (positionals[1] !== 'main') return undefined;
+  return 'Local `main` can be behind the remote, so a branch cut from it is checked against a stale tree. Fetch, then start from `origin/main`: `git fetch origin && git worktree add ../<branch> -b <branch> origin/main`.';
+};
+
 const gitReason = (
   subcommand: string,
   args: string[],
@@ -159,6 +173,7 @@ const gitReason = (
     const skip = `A commit runs the pre-commit hook${hasCheck ? ', which runs `./do check`' : ''}: skipping it with \`--no-verify\` or \`-n\` commits what the checks have not passed. Fix what fails, or stop and ask the builder.`;
     return commitRefusal(args, skip) ?? hooksOffRefusal(env, check) ?? hooklessRefusal(cwd, check);
   }
+  if (subcommand === 'worktree') return staleStartRefusal(args);
   return undefined;
 };
 
