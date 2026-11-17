@@ -31,7 +31,7 @@ describe('the capture note', () => {
   it("carries the skill's When to capture test, and nothing past it", () => {
     const note = JSON.stringify(contextHandler()([{ role: 'user', content: text('build it') }])?.messages.at(-1));
     assert.match(note, /Answer the builder first, then capture in the same turn when they stopped/);
-    assert.match(note, /although they could reveal one\. Write it to/);
+    assert.match(note, /reported as checked was wrong\. Write it to/);
     assert.doesNotMatch(note, /### The entry/);
   });
 
