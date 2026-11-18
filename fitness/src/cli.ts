@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { typescriptAnalyzer } from './analysis/typescript.ts';
 import { checkProject } from './app/check.ts';
-import { diffProject } from './app/diff.ts';
+import { diffProject, parseRange } from './app/diff.ts';
 import { checkReport, diffReport } from './app/report.ts';
 import { gitDirCache } from './git/cache.ts';
 import { gitRepository } from './git/repository.ts';
@@ -12,10 +12,11 @@ import { ConfigError, parseConfig } from './model/config.ts';
 
 const usage = `usage:
   fitness check [--config <file>] [--json] [--fail]
-  fitness diff <base>[..<head>] [--config <file>] [--json | --hook] [--fail]
+  fitness diff <base>[..<head> | ...<head>] [--config <file>] [--json | --hook] [--fail]
 
 check   reports every finding in the working tree.
 diff    reports findings that are new or worse at <head> than at <base>. Without <head>, compares the working tree.
+        <base>...<head> compares from where <head> left <base>, as git does.
 
 --config  path to the config file (default: fitness.config.json)
 --json    print findings as JSON
@@ -49,7 +50,7 @@ const help = (code: number): number => {
 };
 
 const load = (options: Options) => {
-  const configFile = resolve(options.config);
+  const configFile = realpathSync(resolve(options.config));
   return { root: dirname(configFile), config: parseConfig(JSON.parse(readFileSync(configFile, 'utf8'))) };
 };
 
@@ -62,9 +63,8 @@ const check = (options: Options): number => {
 
 const diff = (range: string, options: Options): number => {
   const { root, config } = load(options);
-  const [base, head] = range.split('..');
   const delta = diffProject(
-    { base, head: head || undefined, root, config, toolVersion: version() },
+    { range: parseRange(range), root, config, toolVersion: version() },
     { analyzer: typescriptAnalyzer, repository: gitRepository(root), cache: gitDirCache(root) },
   );
   const changed = delta.added.length + delta.worsened.length > 0;

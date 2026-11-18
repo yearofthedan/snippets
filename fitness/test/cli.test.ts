@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { before, describe, it } from 'node:test';
@@ -51,6 +51,43 @@ describe('fitness diff', () => {
     assert.equal(changed.hookSpecificOutput.hookEventName, 'PostToolUse');
     assert.match(changed.hookSpecificOutput.additionalContext, /new: src\/domain\/audit.ts:1/);
     assert.equal(fitness('diff', 'HEAD', '--hook').stdout, '');
+  });
+
+  it('compares from the merge base with three dots', () => {
+    const run = fitness('diff', 'HEAD~1...HEAD', '--json');
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).added.length, 1);
+  });
+
+  it('refuses a malformed range', () => {
+    const run = fitness('diff', 'HEAD~1..HEAD..HEAD');
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /is not a range/);
+  });
+
+  it('resolves the project path when reached through a symlink', () => {
+    const link = join(mkdtempSync(join(tmpdir(), 'fitness-link-')), 'repo');
+    symlinkSync(repo, link);
+    const config = join(link, 'app/fitness.config.json');
+    const run = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--json', '--config', config], { cwd: project, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).added.length, 1);
+  });
+
+  it('counts a base from before the project existed as having no findings', () => {
+    const fresh = mkdtempSync(join(tmpdir(), 'fitness-fresh-'));
+    const run = (args: string[], cwd = fresh) => execFileSync('git', args, { cwd, encoding: 'utf8' });
+    run(['init', '--quiet']);
+    writeFileSync(join(fresh, 'README.md'), 'before\n');
+    run(['add', '.']);
+    run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'before']);
+    cpSync(join(import.meta.dirname, 'fixtures/hex'), join(fresh, 'app'), { recursive: true });
+    run(['add', '.']);
+    run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'add app']);
+    const diffed = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--json'], { cwd: join(fresh, 'app'), encoding: 'utf8' });
+    assert.equal(diffed.status, 0, diffed.stderr);
+    assert.equal(JSON.parse(diffed.stdout).added.length, 7);
+    assert.equal(run(['worktree', 'list']).trim().split('\n').length, 1);
   });
 
   it('leaves no worktrees behind', () => {

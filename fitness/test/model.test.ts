@@ -20,7 +20,17 @@ describe('parseConfig', () => {
   });
 
   it('refuses an unknown threshold', () => {
-    assert.throws(() => parseConfig({ thresholds: { maxLoc: 1 }, kinds: { app: { match: 'src/**' } } }), /unknown threshold maxLoc/);
+    assert.throws(() => parseConfig({ thresholds: { maxLoc: 1 }, kinds: { app: { match: 'src/**' } } }), /thresholds: unknown key maxLoc/);
+  });
+
+  it('refuses an unknown key at the top level or in a kind', () => {
+    assert.throws(() => parseConfig({ exlude: [], kinds: { app: { match: 'src/**' } } }), /config: unknown key exlude/);
+    assert.throws(() => parseConfig({ kinds: { app: { match: 'src/**', depends: [] } } }), /kinds.app: unknown key depends/);
+  });
+
+  it('refuses a threshold below 1 and a tsconfig that is not a string', () => {
+    assert.throws(() => parseConfig({ thresholds: { maxLines: 0 }, kinds: { app: { match: 'src/**' } } }), /at least 1/);
+    assert.throws(() => parseConfig({ tsconfig: 5, kinds: { app: { match: 'src/**' } } }), /tsconfig: expected a string/);
   });
 
   it('classifies by the first kind that matches', () => {

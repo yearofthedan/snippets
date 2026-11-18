@@ -13,26 +13,28 @@ import {
   isFunctionLikeDeclaration,
   isIdentifier,
   isIfStatement,
+  isPropertyAccessExpression,
   isSwitchStatement,
   isWhileStatement,
 } from 'typescript/ast/is';
 import type { Complexity } from '../model/facts.ts';
-import type { Source } from './source.ts';
+import { type Source, symbolKey } from './source.ts';
 
 /**
  * Cognitive complexity (G. Ann Campbell, SonarSource, 2017). Structures that break linear flow add 1 plus their
  * nesting depth; else, else-if, labelled jumps, each run of mixed logical operators and direct recursion add 1.
  * Nested functions add no increment of their own but deepen the nesting of everything inside them.
  */
-export const cognitiveComplexity = (fn: Node, name: string, source: Source): Complexity => {
-  const walker: Walker = { fn, name, source, increments: [] };
+export const cognitiveComplexity = (fn: Node, self: string | undefined, source: Source): Complexity => {
+  const walker: Walker = { fn, self, source, increments: [] };
   visit(walker, fn, 0);
   return { total: walker.increments.reduce((sum, increment) => sum + increment.amount, 0), increments: walker.increments };
 };
 
 interface Walker {
   fn: Node;
-  name: string;
+  /** Symbol key of the function's own name. Calls that resolve to it are recursion. */
+  self: string | undefined;
   source: Source;
   increments: Complexity['increments'];
 }
@@ -83,7 +85,7 @@ const addFlat = (walker: Walker, node: Node) => {
     const operators = logicalSequence(node);
     add(walker, node, 1 + operators.filter((op, index) => index > 0 && op !== operators[index - 1]).length, 'logical operators');
   }
-  if (isCallExpression(node) && isIdentifier(node.expression) && node.expression.text === walker.name) add(walker, node, 1, 'recursion');
+  if (isCallExpression(node) && walker.self && calleeKey(walker, node.expression) === walker.self) add(walker, node, 1, 'recursion');
 };
 
 const nestingStructure = (node: Node): string | undefined => {
@@ -103,3 +105,9 @@ const logicalSequence = (node: Node): SyntaxKind[] =>
   isBinaryExpression(node) && isLogical(node)
     ? [...logicalSequence(node.left), node.operatorToken.kind, ...logicalSequence(node.right)]
     : [];
+
+/** `f()`, `this.f()` and `x.f()` resolve to the symbol behind `f`. */
+const calleeKey = (walker: Walker, callee: Node): string | undefined => {
+  const name = isPropertyAccessExpression(callee) ? callee.name : callee;
+  return isIdentifier(name) ? symbolKey(walker.source.symbolOf(name)) : undefined;
+};

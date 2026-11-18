@@ -63,7 +63,17 @@ describe('cognitive complexity', () => {
       ['labelled continue', 1],
     ]);
   });
+  it('counts recursion through this', () => assert.equal(fn('Tree.walk')?.complexity?.total, 1));
+  it('ignores a call to a local that shadows the function name', () => assert.equal(fn('shadowed')?.complexity?.total, 0));
   it('folds nested functions into the outermost one', () => assert.equal(fn('check')?.complexity, undefined));
+});
+
+describe('function names', () => {
+  it('name a callback by its call and a string first argument', () => {
+    const names = [...modules.values()].flatMap((m) => m.functions.map((f) => f.name));
+    assert.ok(names.includes('<callback to [1, 2].map>'));
+    assert.deepEqual(modules.get('src/callbacks.ts')?.functions.map((f) => f.name).slice(1), ['<callback to it("first")>', '<callback to it("second")>']);
+  });
 });
 
 describe('function statements', () => {

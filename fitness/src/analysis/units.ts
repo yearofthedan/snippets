@@ -21,6 +21,7 @@ import {
   isPropertyAccessExpression,
   isPropertyAssignment,
   isPropertyDeclaration,
+  isStringLiteralLikeNode,
   isThisExpression,
   isTypeAliasDeclaration,
   isVariableDeclaration,
@@ -144,7 +145,7 @@ export const functionFacts = (source: Source): FunctionFacts[] => {
         endLine,
         lines: endLine - line + 1,
         statements: isBlock(node.body) ? statementGraph(node, node.body.statements, source) : { units: [], links: [] },
-        ...(outermost ? { complexity: cognitiveComplexity(node, name, source) } : {}),
+        ...(outermost ? { complexity: cognitiveComplexity(node, selfKey(node, source), source) } : {}),
       });
       node.forEachChild((child) => {
         visit(child, false);
@@ -204,6 +205,22 @@ const functionName = (node: Node, source: Source): string => {
   if (isVariableDeclaration(parent) || isPropertyAssignment(parent) || isPropertyDeclaration(parent)) {
     return parent.name.getText(source.sourceFile);
   }
-  if (isCallExpression(parent)) return `<callback to ${parent.expression.getText(source.sourceFile)}>`;
+  if (isCallExpression(parent)) {
+    const [first] = parent.arguments;
+    const label = first && isStringLiteralLikeNode(first) ? `(${JSON.stringify(first.text)})` : '';
+    return `<callback to ${parent.expression.getText(source.sourceFile)}${label}>`;
+  }
   return isFunctionDeclaration(node) ? 'default' : '<anonymous>';
+};
+
+/** The symbol key of the name a function is declared or assigned under, so calls to it count as recursion. */
+const selfKey = (node: Node, source: Source): string | undefined => {
+  const parent = node.parent;
+  const name =
+    'name' in node && node.name
+      ? (node.name as Node)
+      : isVariableDeclaration(parent) || isPropertyAssignment(parent) || isPropertyDeclaration(parent)
+        ? parent.name
+        : undefined;
+  return name && isIdentifier(name) ? symbolKey(source.symbolOf(name)) : undefined;
 };

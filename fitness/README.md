@@ -24,6 +24,7 @@ In the project to check, add a `fitness.config.json` next to its `tsconfig.json`
 fitness check                 # every finding in the working tree
 fitness diff HEAD             # new or worse findings in the working tree since HEAD
 fitness diff main..feature    # new or worse findings between two refs
+fitness diff main...          # new or worse findings since the working tree's branch left main
 ```
 
 | Flag | Effect |
@@ -53,6 +54,7 @@ fitness diff main..feature    # new or worse findings between two refs
   first. A kind may always import from itself.
 - `thresholds` at the top level apply to every kind. A kind's own `thresholds` override them. The values shown are
   the defaults.
+- Unknown keys are refused, so a misspelt option fails loudly. Thresholds are whole numbers of at least 1.
 - `exclude` removes files from the model entirely. Declaration files are always excluded.
 - The files checked are the ones the tsconfig includes. A solution-style tsconfig with only `references` is not
   followed: point `tsconfig` at a project config.
@@ -87,17 +89,21 @@ groups' line ranges.
 
 **`cognitive-complexity`**: SonarSource's cognitive complexity for each outermost function, with nested functions
 counted into it. `if`, ternaries, `switch`, loops and `catch` add 1 plus their nesting depth. `else`, `else if`,
-labelled jumps, each run of mixed `&&`/`||`/`??` and direct recursion add 1. The finding names the largest increments.
+labelled jumps, each run of mixed `&&`/`||`/`??` and direct recursion (a call that resolves to the function itself,
+`this.method()` included) add 1. The finding names the largest increments.
 
 ## Diff
 
 `diff <base>[..<head>]` checks both sides with the working tree's config, so a delta reflects code changes, never
-rule changes. A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
+rule changes. With three dots, `<base>...<head>`, the base is where `<head>` (or the working tree's `HEAD`) left
+`<base>`, as in git. A base commit where the project's tsconfig does not exist yet counts as having no findings. A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
 findings are cached under `.git/fitness-cache/` by commit, config and tool version, so repeated runs against the same
 base only analyse the head. Without a head, the head is the working tree.
 
 A finding is new when its key is absent at the base, and worse when its value rose. Findings in a renamed file or
-function count as new.
+function count as new. Function findings are keyed by name, and a callback is named after its call and a string first
+argument, such as `<callback to it("saves an order")>`, so a key survives edits elsewhere in the file. Functions that
+still share a name get `#2`, `#3` in order of appearance.
 
 ## Claude Code hook
 
@@ -122,7 +128,7 @@ context for its next step; an empty one prints nothing. The command exits 0 eith
 a bad config, which Claude Code shows to the user without blocking.
 
 `diff HEAD` measures uncommitted changes, so a commit resets the baseline. To measure the whole branch instead, diff
-against where it left main: `fitness diff "$(git merge-base HEAD main)" --hook`.
+against where it left main: `fitness diff main... --hook`.
 
 ## Compiler
 

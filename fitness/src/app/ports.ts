@@ -12,8 +12,13 @@ export interface Repository {
   projectPath(): string;
   /** The commit a ref names. */
   commit(ref: string): string;
-  /** Checks a commit out into a temporary directory and returns the project directory inside it. */
-  checkout(commit: string): { projectRoot: string; dispose(): void };
+  /** The best common ancestor of two refs. */
+  mergeBase(a: string, b: string): string;
+  /**
+   * Checks a commit out into a temporary directory and returns the project directory inside it, or no project root
+   * when that commit has no `requiredFile` in the project directory.
+   */
+  checkout(commit: string, requiredFile: string): { projectRoot?: string; dispose(): void };
 }
 
 /** Findings for a commit, which never change while the config and tool stay the same. */

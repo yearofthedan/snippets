@@ -32,9 +32,12 @@ export class ConfigError extends Error {}
 /** Validates raw JSON from fitness.config.json. Kinds keep their declared order: the first match wins. */
 export const parseConfig = (raw: unknown): Config => {
   const object = record(raw, 'config');
+  known(object, ['tsconfig', 'exclude', 'thresholds', 'kinds'], 'config');
+  if (object.tsconfig !== undefined && typeof object.tsconfig !== 'string') throw new ConfigError('tsconfig: expected a string');
   const shared = { ...defaultThresholds, ...thresholds(object.thresholds, 'thresholds') };
   const kinds = Object.entries(record(object.kinds ?? {}, 'kinds')).map(([name, value]): Kind => {
     const kind = record(value, `kinds.${name}`);
+    known(kind, ['match', 'dependsOn', 'thresholds'], `kinds.${name}`);
     return {
       name,
       match: strings(kind.match, `kinds.${name}.match`),
@@ -80,10 +83,17 @@ const thresholds = (value: unknown, at: string): Partial<Thresholds> => {
   const result: Partial<Thresholds> = {};
   for (const key of Object.keys(defaultThresholds) as (keyof Thresholds)[]) {
     if (object[key] === undefined) continue;
-    if (typeof object[key] !== 'number') throw new ConfigError(`${at}.${key}: expected a number`);
-    result[key] = object[key];
+    const number = object[key];
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) {
+      throw new ConfigError(`${at}.${key}: expected a whole number of at least 1`);
+    }
+    result[key] = number;
   }
-  const unknown = Object.keys(object).filter((key) => !(key in defaultThresholds));
-  if (unknown.length > 0) throw new ConfigError(`${at}: unknown threshold ${unknown.join(', ')}`);
+  known(object, Object.keys(defaultThresholds), at);
   return result;
+};
+
+const known = (object: Record<string, unknown>, keys: string[], at: string) => {
+  const unknown = Object.keys(object).filter((key) => !keys.includes(key));
+  if (unknown.length > 0) throw new ConfigError(`${at}: unknown key ${unknown.join(', ')}`);
 };

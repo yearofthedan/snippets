@@ -31,3 +31,16 @@ export class Counter {
 }
 
 export const area = (circle: Circle) => circle.r * new Square().side * lib.all.unit;
+
+export class Tree {
+  walk(): number {
+    return this.walk();
+  }
+}
+
+export function shadowed() {
+  const shadowed = () => 1;
+  return shadowed();
+}
+
+export const cases = [1, 2].map((n) => n);
