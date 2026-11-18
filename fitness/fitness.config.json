@@ -1,0 +1,10 @@
+{
+  "tsconfig": "tsconfig.json",
+  "exclude": ["test/**"],
+  "kinds": {
+    "model": { "match": "src/model/**", "dependsOn": [] },
+    "app": { "match": "src/app/**", "dependsOn": ["model"] },
+    "adapter": { "match": ["src/analysis/**", "src/git/**"], "dependsOn": ["app", "model"] },
+    "entry": { "match": "src/cli.ts", "dependsOn": ["adapter", "app", "model"] }
+  }
+}

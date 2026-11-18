@@ -1,0 +1,8 @@
+{
+  "thresholds": { "maxLines": 15, "maxFunctionLines": 6, "maxComplexity": 4 },
+  "kinds": {
+    "domain": { "match": "src/domain/**", "dependsOn": [] },
+    "app": { "match": "src/app/**", "dependsOn": ["domain"] },
+    "adapter": { "match": "src/adapters/**", "dependsOn": ["domain", "app"] }
+  }
+}
