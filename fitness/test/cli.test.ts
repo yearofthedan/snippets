@@ -28,7 +28,7 @@ before(() => {
 
 describe('fitness diff', () => {
   it('reports only new and worsened findings against the working tree', () => {
-    const run = fitness('diff', 'HEAD', '--json');
+    const run = fitness('diff', 'HEAD', '--reporter', 'json');
     assert.equal(run.status, 0, run.stderr);
     const delta = JSON.parse(run.stdout);
     assert.deepEqual(delta.added.map((f: { key: string }) => f.key), ['dependency-direction:src/domain/audit.ts->src/app/handle.ts']);
@@ -47,14 +47,14 @@ describe('fitness diff', () => {
   });
 
   it('prints a hook response only when there is a delta', () => {
-    const changed = JSON.parse(fitness('diff', 'HEAD~1..HEAD', '--hook').stdout);
+    const changed = JSON.parse(fitness('diff', 'HEAD~1..HEAD', '--reporter', 'claude-hook').stdout);
     assert.equal(changed.hookSpecificOutput.hookEventName, 'PostToolUse');
     assert.match(changed.hookSpecificOutput.additionalContext, /new: src\/domain\/audit.ts:1/);
-    assert.equal(fitness('diff', 'HEAD', '--hook').stdout, '');
+    assert.equal(fitness('diff', 'HEAD', '--reporter', 'claude-hook').stdout, '');
   });
 
   it('compares from the merge base with three dots', () => {
-    const run = fitness('diff', 'HEAD~1...HEAD', '--json');
+    const run = fitness('diff', 'HEAD~1...HEAD', '--reporter', 'json');
     assert.equal(run.status, 0, run.stderr);
     assert.equal(JSON.parse(run.stdout).added.length, 1);
   });
@@ -69,7 +69,7 @@ describe('fitness diff', () => {
     const link = join(mkdtempSync(join(tmpdir(), 'fitness-link-')), 'repo');
     symlinkSync(repo, link);
     const config = join(link, 'app/fitness.config.json');
-    const run = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--json', '--config', config], { cwd: project, encoding: 'utf8' });
+    const run = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--reporter', 'json', '--config', config], { cwd: project, encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
     assert.equal(JSON.parse(run.stdout).added.length, 1);
   });
@@ -84,7 +84,7 @@ describe('fitness diff', () => {
     cpSync(join(import.meta.dirname, 'fixtures/hexagonal-app'), join(fresh, 'app'), { recursive: true });
     run(['add', '.']);
     run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'add app']);
-    const diffed = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--json'], { cwd: join(fresh, 'app'), encoding: 'utf8' });
+    const diffed = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--reporter', 'json'], { cwd: join(fresh, 'app'), encoding: 'utf8' });
     assert.equal(diffed.status, 0, diffed.stderr);
     assert.equal(JSON.parse(diffed.stdout).added.length, 7);
     assert.equal(run(['worktree', 'list']).trim().split('\n').length, 1);
@@ -98,6 +98,12 @@ describe('fitness diff', () => {
 describe('fitness check', () => {
   it('exits 1 with --fail when there are findings', () => {
     assert.equal(fitness('check', '--fail').status, 1);
+  });
+
+  it('refuses an unknown reporter', () => {
+    const run = fitness('check', '--reporter', 'xml');
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /no reporter called xml/);
   });
 
   it('reports a config error', () => {

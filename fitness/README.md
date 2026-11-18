@@ -1,8 +1,8 @@
 # fitness
 
 Architectural fitness checks for TypeScript codebases. It builds a model of the codebase (the import graph, which
-kind each module is, and the rules between kinds) and reports findings against it, as text for people and JSON for
-agents. `diff` reports only what a change made new or worse, so it can run after every edit.
+kind each module is, and the rules between kinds) and reports findings against it, as text for people, JSON or SARIF
+for tools, and hook responses for coding agents. `diff` reports only what a change made new or worse, so it can run after every edit.
 
 First cut. It covers module kinds, dependency direction, cohesion and cognitive complexity. Import counts, import
 distance, orchestration weight, export surface and fan-in come later.
@@ -30,8 +30,7 @@ fitness diff main...          # new or worse findings since the working tree's b
 | Flag | Effect |
 | --- | --- |
 | `--config <file>` | Config path. The project root is its directory. Default `fitness.config.json`. |
-| `--json` | Findings as JSON. Each finding carries the same `message` the text output prints. |
-| `--hook` | `diff` only: a Claude Code hook response, or no output when nothing is new or worse. |
+| `--reporter <name>` | Output format, default `text`. See [Reporters](#reporters). |
 | `--fail` | Exit 1 when there are findings (`check`) or new or worse ones (`diff`). Without it, both exit 0. |
 
 ## Config
@@ -125,7 +124,26 @@ function count as new. Function findings are keyed by name, and a callback is na
 argument, such as `<callback to it("saves an order")>`, so a key survives edits elsewhere in the file. Functions that
 still share a name get `#2`, `#3` in order of appearance.
 
-## Claude Code hook
+## Reporters
+
+A reporter turns a check or diff result into output. Each is its own module in
+[`src/app/reporters/`](./src/app/reporters), looked up by name.
+
+| Reporter | Output |
+| --- | --- |
+| `text` | One line per finding, then a count. For `diff`, findings are marked `new` or `worse (was N)`. |
+| `json` | `{ findings }` for `check`; `{ added, worsened, resolved }` for `diff`. Each finding has the same `message`. |
+| `sarif` | SARIF 2.1.0 for GitHub code scanning: the findings to act on, with paths from the repository root. |
+| `claude-hook` | A Claude Code PostToolUse hook response, or nothing when there is nothing to act on. |
+| `omp` | An omp `tool_result` handler result, or nothing when there is nothing to act on. |
+
+"To act on" means every finding for `check` and the new and worse ones for `diff`. With `--reporter claude-hook`, an
+error exits 1 rather than 2, which Claude Code would treat as blocking feedback.
+
+`diff HEAD` measures uncommitted changes, so a commit resets the baseline. To measure the whole branch instead, diff
+against where it left main, `main...`, in any of the agent setups below.
+
+### Claude Code
 
 To have Claude Code see the delta after each edit without being blocked, add a `PostToolUse` hook to the project's
 `.claude/settings.json`:
@@ -136,19 +154,53 @@ To have Claude Code see the delta after each edit without being blocked, add a `
     "PostToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write",
-        "hooks": [{ "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && fitness diff HEAD --hook", "timeout": 60 }]
+        "hooks": [
+          { "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && fitness diff HEAD --reporter claude-hook", "timeout": 60 }
+        ]
       }
     ]
   }
 }
 ```
 
-With `--hook`, a non-empty delta prints a `hookSpecificOutput.additionalContext` response, which Claude reads as
-context for its next step; an empty one prints nothing. The command exits 0 either way, and exits 1 on an error such as
-a bad config, which Claude Code shows to the user without blocking.
+A non-empty delta prints a `hookSpecificOutput.additionalContext` response, which Claude reads as context for its next
+step.
 
-`diff HEAD` measures uncommitted changes, so a commit resets the baseline. To measure the whole branch instead, diff
-against where it left main: `fitness diff main... --hook`.
+### omp
+
+[`integrations/omp/fitness.ts`](./integrations/omp/fitness.ts) is an omp extension. After each successful `edit`,
+`write`, `ast_edit` or `apply_patch`, it runs `fitness diff HEAD --reporter omp` in the session's directory and returns
+the result from its `tool_result` handler. omp sends a handler's `additionalContext` with the next request to the
+model, outside the tool result, and the edit itself is never blocked. A failed run is left out of the context.
+
+Install it for one project, or for every project under `~/.omp/agent/extensions/` instead:
+
+```sh
+mkdir -p .omp/extensions
+ln -s ~/src/snippets/fitness/integrations/omp/fitness.ts .omp/extensions/fitness.ts
+```
+
+Set `FITNESS_BASE=main...` to diff the whole branch, and `FITNESS_COMMAND` when `fitness` is not on the PATH. omp
+loads extensions at session start. The event and result shapes are from `@oh-my-pi/pi-coding-agent` 18.22
+(`dist/types/extensibility/extensions/types.d.ts`).
+
+### GitHub code scanning
+
+```yaml
+permissions:
+  security-events: write
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - run: fitness diff origin/${{ github.base_ref }}... --reporter sarif > fitness.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: fitness.sarif
+```
+
+Each result's `partialFingerprints` holds the finding's key, so code scanning tracks a finding across commits the
+same way `diff` does.
 
 ## Compiler
 

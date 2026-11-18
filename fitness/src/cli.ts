@@ -5,26 +5,26 @@ import { parseArgs } from 'node:util';
 import { typescriptAnalyzer } from './analysis/typescript.ts';
 import { checkProject } from './app/check.ts';
 import { diffProject, parseRange } from './app/diff.ts';
-import { checkReport, diffReport } from './app/report.ts';
+import { reporters } from './app/reporters/index.ts';
+import { actionable, type Report } from './app/reporters/reporter.ts';
 import { gitDirCache } from './git/cache.ts';
-import { gitRepository } from './git/repository.ts';
-import { ConfigError, parseConfig } from './model/config.ts';
+import { gitRepository, projectPathOf } from './git/repository.ts';
+import { type Config, ConfigError, parseConfig } from './model/config.ts';
 import { builtinRegistry } from './model/rules/index.ts';
 
 const usage = `usage:
-  fitness check [--config <file>] [--json] [--fail]
-  fitness diff <base>[..<head> | ...<head>] [--config <file>] [--json | --hook] [--fail]
+  fitness check [--config <file>] [--reporter <name>] [--fail]
+  fitness diff <base>[..<head> | ...<head>] [--config <file>] [--reporter <name>] [--fail]
 
 check   reports every finding in the working tree.
 diff    reports findings that are new or worse at <head> than at <base>. Without <head>, compares the working tree.
         <base>...<head> compares from where <head> left <base>, as git does.
 
---config  path to the config file (default: fitness.config.json)
---json    print findings as JSON
---hook    print a Claude Code PostToolUse hook response, and nothing when there is no delta
---fail    exit 1 when there are findings (check) or new or worse findings (diff)`;
+--config    path to the config file (default: fitness.config.json)
+--reporter  ${[...reporters.keys()].join(', ')} (default: text)
+--fail      exit 1 when there are findings (check) or new or worse findings (diff)`;
 
-type Options = { config: string; json: boolean; hook: boolean; fail: boolean; help: boolean };
+type Options = { config: string; reporter: string; fail: boolean; help: boolean };
 
 const main = (argv: string[]): number => {
   const { values, positionals } = parseArgs({
@@ -32,16 +32,15 @@ const main = (argv: string[]): number => {
     allowPositionals: true,
     options: {
       config: { type: 'string', default: 'fitness.config.json' },
-      json: { type: 'boolean', default: false },
-      hook: { type: 'boolean', default: false },
+      reporter: { type: 'string', default: 'text' },
       fail: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
   });
   const [command, ...args] = positionals;
   if (values.help) return help(0);
-  if (command === 'check' && args.length === 0) return check(values);
-  if (command === 'diff' && args.length === 1) return diff(args[0], values);
+  if (command === 'check' && args.length === 0) return run(values, (root, config) => ({ mode: 'check', findings: checkProject(typescriptAnalyzer, root, config) }));
+  if (command === 'diff' && args.length === 1) return run(values, (root, config) => ({ mode: 'diff', delta: delta(args[0], root, config) }));
   return help(2);
 };
 
@@ -50,36 +49,22 @@ const help = (code: number): number => {
   return code;
 };
 
-const load = (options: Options) => {
+const run = (options: Options, produce: (root: string, config: Config) => Report): number => {
+  const reporter = reporters.get(options.reporter);
+  if (!reporter) throw new Error(`no reporter called ${options.reporter}: use one of ${[...reporters.keys()].join(', ')}`);
   const configFile = realpathSync(resolve(options.config));
-  return { root: dirname(configFile), config: parseConfig(JSON.parse(readFileSync(configFile, 'utf8')), builtinRegistry) };
+  const root = dirname(configFile);
+  const report = produce(root, parseConfig(JSON.parse(readFileSync(configFile, 'utf8')), builtinRegistry));
+  const output = reporter.render(report, { toolVersion: version(), projectPath: projectPathOf(root) });
+  if (output) console.log(output);
+  return options.fail && actionable(report).length > 0 ? 1 : 0;
 };
 
-const check = (options: Options): number => {
-  const { root, config } = load(options);
-  const findings = checkProject(typescriptAnalyzer, root, config);
-  console.log(options.json ? JSON.stringify({ findings }, null, 2) : checkReport(findings));
-  return options.fail && findings.length > 0 ? 1 : 0;
-};
-
-const diff = (range: string, options: Options): number => {
-  const { root, config } = load(options);
-  const delta = diffProject(
+const delta = (range: string, root: string, config: Config) =>
+  diffProject(
     { range: parseRange(range), root, config, toolVersion: version() },
     { analyzer: typescriptAnalyzer, repository: gitRepository(root), cache: gitDirCache(root) },
   );
-  const changed = delta.added.length + delta.worsened.length > 0;
-  const output = options.hook ? changed && JSON.stringify(hookResponse(diffReport(delta))) : options.json ? JSON.stringify(delta, null, 2) : diffReport(delta);
-  if (output) console.log(output);
-  return options.fail && changed ? 1 : 0;
-};
-
-const hookResponse = (report: string) => ({
-  hookSpecificOutput: {
-    hookEventName: 'PostToolUse',
-    additionalContext: `Architecture fitness changes since the base commit. Address them if this edit caused them:\n${report}`,
-  },
-});
 
 const version = (): string => JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
@@ -88,5 +73,7 @@ try {
 } catch (error) {
   console.error(error instanceof ConfigError ? `fitness config: ${error.message}` : error instanceof Error ? error.message : error);
   // Claude Code treats exit 2 from a hook as blocking feedback; a broken run should only warn.
-  process.exitCode = process.argv.includes('--hook') ? 1 : 2;
+  const argv = process.argv;
+  const hook = argv.some((arg, index) => arg === '--reporter=claude-hook' || (arg === '--reporter' && argv[index + 1] === 'claude-hook'));
+  process.exitCode = hook ? 1 : 2;
 }

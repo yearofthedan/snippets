@@ -45,3 +45,12 @@ export const gitRepository = (projectRoot: string): Repository => {
     },
   };
 };
+
+/** The project's path inside its git repository, or empty when it is the root or not in a repository. */
+export const projectPathOf = (projectRoot: string): string => {
+  try {
+    return gitRepository(projectRoot).projectPath();
+  } catch {
+    return '';
+  }
+};
