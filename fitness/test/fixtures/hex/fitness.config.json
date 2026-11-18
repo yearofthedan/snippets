@@ -1,5 +1,9 @@
 {
-  "thresholds": { "maxLines": 15, "maxFunctionLines": 6, "maxComplexity": 4 },
+  "rules": {
+    "module-cohesion": { "maxLines": 15 },
+    "function-cohesion": { "maxLines": 6 },
+    "cognitive-complexity": { "max": 4 }
+  },
   "kinds": {
     "domain": { "match": "src/domain/**", "dependsOn": [] },
     "app": { "match": "src/app/**", "dependsOn": ["domain"] },

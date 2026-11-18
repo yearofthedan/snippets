@@ -40,11 +40,19 @@ fitness diff main...          # new or worse findings since the working tree's b
 {
   "tsconfig": "tsconfig.json",
   "exclude": ["**/*.test.ts"],
-  "thresholds": { "maxLines": 200, "maxFunctionLines": 40, "maxComplexity": 15 },
+  "rules": {
+    "module-cohesion": { "maxLines": 200 },
+    "function-cohesion": { "maxLines": 40 },
+    "cognitive-complexity": { "max": 15 }
+  },
   "kinds": {
     "domain": { "match": "src/domain/**", "dependsOn": [] },
     "app": { "match": "src/app/**", "dependsOn": ["domain"] },
-    "adapter": { "match": ["src/adapters/**"], "dependsOn": ["domain", "app"], "thresholds": { "maxLines": 300 } },
+    "adapter": {
+      "match": ["src/adapters/**"],
+      "dependsOn": ["domain", "app"],
+      "rules": { "module-cohesion": { "maxLines": 300 }, "function-cohesion": false }
+    },
     "utility": { "match": "src/lib/**", "dependsOn": [] }
   }
 }
@@ -52,9 +60,9 @@ fitness diff main...          # new or worse findings since the working tree's b
 
 - `kinds` are checked in the order written and the first whose `match` glob fits a file wins, so put narrow globs
   first. A kind may always import from itself.
-- `thresholds` at the top level apply to every kind. A kind's own `thresholds` override them. The values shown are
-  the defaults.
-- Unknown keys are refused, so a misspelt option fails loudly. Thresholds are whole numbers of at least 1.
+- Every rule runs on every kind. `rules` at the top level sets options for all kinds, and a kind's own `rules`
+  overrides them. `false` turns a rule off, and `true` turns it back on for a kind. The options shown are the defaults.
+- Unknown keys, rules and options are refused, so a misspelling fails loudly. Limits are whole numbers of at least 1.
 - `exclude` removes files from the model entirely. Declaration files are always excluded.
 - The files checked are the ones the tsconfig includes. A solution-style tsconfig with only `references` is not
   followed: point `tsconfig` at a project config.
@@ -63,12 +71,21 @@ See [`fitness.config.json`](./fitness.config.json) for the config this tool chec
 
 ## Rules
 
+Analysis extracts the facts once for the whole project: the import graph, each module's top-level units and the
+links between them, and each function's statements and complexity. Each rule is its own module in
+[`src/model/rules/`](./src/model/rules) that reads those facts for one module at a time, so it stays pure. A rule
+declares its id, its default options and how to validate them, and a `check` that returns findings. Rules are looked
+up in a registry, which is how a project's own rules will join the built-in ones; loading them from the config is not
+wired up yet.
+
 Every finding has a `rule`, a `key` that identifies it across commits, a `value` that `diff` compares, a `message`,
 and `details` an agent can act on.
 
-**`unclassified`**: the module matches no kind, so no other rule applies to it.
+**`unclassified`**: the module matches no kind. This comes from the model rather than a rule: a module without a kind
+has no rules to run.
 
-**`dependency-direction`**: a module imports a kind its own kind's `dependsOn` does not list. Named imports resolve
+**`dependency-direction`** (no options; the kind's `dependsOn` sets what it allows): a module imports a kind its own
+kind's `dependsOn` does not list. Named imports resolve
 through barrels and re-exports to the module that declares them, so a domain module importing `../adapters` is
 reported against the adapter file behind the barrel, with the barrel named as the route. Type-only imports
 (`import type`, `import { type X }`, or names that only declare types) are recorded separately on the edge and still
@@ -76,27 +93,30 @@ count. There is one finding per pair of modules. Its value is the number of name
 the same boundary counts as worse. When the target kind may depend on the importer's kind, the message advises a port;
 otherwise it advises moving the code or allowing the dependency.
 
-**`module-cohesion`**: LCOM4 over a module's top-level code, checked only when the module is over `maxLines`. Functions
+**`module-cohesion`** (`maxLines`): LCOM4 over a module's top-level code, checked only when the module is over
+`maxLines`. Functions
 and classes are the units. Two units are linked when one references the other, or both reference the same top-level
 state or type declared in the module. Top-level statements that declare nothing count together as one unit. A module
 whose units form one connected group passes at any size. Otherwise the finding lists each group's names and line range,
 which is where to split.
 
-**`function-cohesion`**: the same measure inside a function over `maxFunctionLines`. The units are the body's
+**`function-cohesion`** (`maxLines`): the same measure inside a function over `maxLines`. The units are the body's
 statements, linked when they share a parameter, a local or a `this.<member>`. Parameters count as shared, so guard
 clauses stay attached to the code they guard. Statements that touch none of these are left out. The finding lists the
 groups' line ranges.
 
-**`cognitive-complexity`**: SonarSource's cognitive complexity for each outermost function, with nested functions
-counted into it. `if`, ternaries, `switch`, loops and `catch` add 1 plus their nesting depth. `else`, `else if`,
-labelled jumps, each run of mixed `&&`/`||`/`??` and direct recursion (a call that resolves to the function itself,
-`this.method()` included) add 1. The finding names the largest increments.
+**`cognitive-complexity`** (`max`): SonarSource's cognitive complexity for each outermost function, with nested
+functions counted into it. `if`, ternaries, `switch`, loops and `catch` add 1 plus their nesting depth. `else`,
+`else if`, labelled jumps, each run of mixed `&&`/`||`/`??` and direct recursion (a call that resolves to the function
+itself, `this.method()` included) add 1. The finding names the largest increments.
 
 ## Diff
 
 `diff <base>[..<head>]` checks both sides with the working tree's config, so a delta reflects code changes, never
 rule changes. With three dots, `<base>...<head>`, the base is where `<head>` (or the working tree's `HEAD`) left
-`<base>`, as in git. A base commit where the project's tsconfig does not exist yet counts as having no findings. A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
+`<base>`, as in git. A base commit where the project's tsconfig does not exist yet counts as having no findings.
+
+A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
 findings are cached under `.git/fitness-cache/` by commit, config and tool version, so repeated runs against the same
 base only analyse the head. Without a head, the head is the working tree.
 

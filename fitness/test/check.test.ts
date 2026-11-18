@@ -5,13 +5,14 @@ import { before, describe, it } from 'node:test';
 import { typescriptAnalyzer } from '../src/analysis/typescript.ts';
 import { checkProject } from '../src/app/check.ts';
 import { parseConfig } from '../src/model/config.ts';
-import type { Finding } from '../src/model/rules.ts';
+import { builtinRegistry } from '../src/model/rules/index.ts';
+import type { Finding } from '../src/model/rule.ts';
 
 const root = join(import.meta.dirname, 'fixtures/hex');
 let findings: Finding[];
 
 before(() => {
-  findings = checkProject(typescriptAnalyzer, root, parseConfig(JSON.parse(readFileSync(join(root, 'fitness.config.json'), 'utf8'))));
+  findings = checkProject(typescriptAnalyzer, root, parseConfig(JSON.parse(readFileSync(join(root, 'fitness.config.json'), 'utf8')), builtinRegistry));
 });
 
 const byKey = (key: string) => findings.find((finding) => finding.key === key);

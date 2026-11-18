@@ -1,5 +1,5 @@
 import type { Delta } from '../model/diff.ts';
-import type { Finding } from '../model/rules.ts';
+import type { Finding } from '../model/rule.ts';
 
 export const checkReport = (findings: Finding[]): string =>
   findings.length === 0 ? 'No findings.' : [...findings.map(line), '', count(findings.length, 'finding')].join('\n');

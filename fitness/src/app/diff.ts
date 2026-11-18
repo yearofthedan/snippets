@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Config } from '../model/config.ts';
 import { type Delta, diff } from '../model/diff.ts';
-import type { Finding } from '../model/rules.ts';
+import type { Finding } from '../model/rule.ts';
 import { checkProject } from './check.ts';
 import type { Analyzer, FindingsCache, Repository } from './ports.ts';
 

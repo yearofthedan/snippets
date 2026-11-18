@@ -9,6 +9,7 @@ import { checkReport, diffReport } from './app/report.ts';
 import { gitDirCache } from './git/cache.ts';
 import { gitRepository } from './git/repository.ts';
 import { ConfigError, parseConfig } from './model/config.ts';
+import { builtinRegistry } from './model/rules/index.ts';
 
 const usage = `usage:
   fitness check [--config <file>] [--json] [--fail]
@@ -51,7 +52,7 @@ const help = (code: number): number => {
 
 const load = (options: Options) => {
   const configFile = realpathSync(resolve(options.config));
-  return { root: dirname(configFile), config: parseConfig(JSON.parse(readFileSync(configFile, 'utf8'))) };
+  return { root: dirname(configFile), config: parseConfig(JSON.parse(readFileSync(configFile, 'utf8')), builtinRegistry) };
 };
 
 const check = (options: Options): number => {

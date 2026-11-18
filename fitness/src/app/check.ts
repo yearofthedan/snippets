@@ -1,5 +1,6 @@
 import type { Config } from '../model/config.ts';
-import { check, type Finding } from '../model/rules.ts';
+import { check } from '../model/check.ts';
+import type { Finding } from '../model/rule.ts';
 import type { Analyzer } from './ports.ts';
 
 export const checkProject = (analyzer: Analyzer, root: string, config: Config): Finding[] =>

@@ -1,6 +1,6 @@
 import type { Config } from '../model/config.ts';
 import type { Project } from '../model/facts.ts';
-import type { Finding } from '../model/rules.ts';
+import type { Finding } from '../model/rule.ts';
 
 export interface Analyzer {
   analyze(root: string, config: Config): Project;

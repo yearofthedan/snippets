@@ -4,13 +4,14 @@ import { join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { typescriptAnalyzer } from '../src/analysis/typescript.ts';
 import { parseConfig } from '../src/model/config.ts';
+import { builtinRegistry } from '../src/model/rules/index.ts';
 import type { ModuleFacts } from '../src/model/facts.ts';
 
 const root = join(import.meta.dirname, 'fixtures/facts');
 let modules: Map<string, ModuleFacts>;
 
 before(() => {
-  const config = parseConfig(JSON.parse(readFileSync(join(root, 'fitness.config.json'), 'utf8')));
+  const config = parseConfig(JSON.parse(readFileSync(join(root, 'fitness.config.json'), 'utf8')), builtinRegistry);
   modules = new Map(typescriptAnalyzer.analyze(root, config).modules.map((module) => [module.file, module]));
 });
 
@@ -46,7 +47,7 @@ describe('import graph', () => {
 
   it('marks an import type-only when every name declares only a type', () => {
     const hex = join(import.meta.dirname, 'fixtures/hex');
-    const config = parseConfig(JSON.parse(readFileSync(join(hex, 'fitness.config.json'), 'utf8')));
+    const config = parseConfig(JSON.parse(readFileSync(join(hex, 'fitness.config.json'), 'utf8')), builtinRegistry);
     const order = typescriptAnalyzer.analyze(hex, config).modules.find((module) => module.file === 'src/domain/order.ts');
     assert.deepEqual(order?.imports.map((edge) => [edge.names, edge.typeOnly]), [[['saveOrder'], false], [['OrderRow'], true]]);
   });

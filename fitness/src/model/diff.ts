@@ -1,4 +1,4 @@
-import type { Finding } from './rules.ts';
+import type { Finding } from './rule.ts';
 
 export interface Delta {
   /** Findings whose key is absent at the base. */

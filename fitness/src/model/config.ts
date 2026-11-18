@@ -1,12 +1,11 @@
 import { matchesGlob } from 'node:path';
+import { ConfigError, type Rule } from './rule.ts';
 
-export interface Thresholds {
-  /** Module line count that triggers the module cohesion check. */
-  maxLines: number;
-  /** Function line count that triggers the function cohesion check. */
-  maxFunctionLines: number;
-  /** Highest cognitive complexity a function may have. */
-  maxComplexity: number;
+export { ConfigError } from './rule.ts';
+
+export interface EnabledRule {
+  rule: Rule;
+  options: object;
 }
 
 export interface Kind {
@@ -14,7 +13,8 @@ export interface Kind {
   match: string[];
   /** Kinds this kind may import from. Its own kind is always allowed. */
   dependsOn: string[];
-  thresholds: Thresholds;
+  /** The rules that run on this kind's modules, with their options resolved. */
+  rules: EnabledRule[];
 }
 
 export interface Config {
@@ -23,26 +23,25 @@ export interface Config {
   kinds: Kind[];
 }
 
-export const defaultThresholds: Thresholds = { maxLines: 200, maxFunctionLines: 40, maxComplexity: 15 };
-
 const alwaysExcluded = ['**/*.d.ts'];
 
-export class ConfigError extends Error {}
-
-/** Validates raw JSON from fitness.config.json. Kinds keep their declared order: the first match wins. */
-export const parseConfig = (raw: unknown): Config => {
+/**
+ * Validates raw JSON from fitness.config.json against the rules in `registry`. Kinds keep their declared order: the
+ * first match wins. Every registered rule runs on every kind unless the config turns it off.
+ */
+export const parseConfig = (raw: unknown, registry: ReadonlyMap<string, Rule>): Config => {
   const object = record(raw, 'config');
-  known(object, ['tsconfig', 'exclude', 'thresholds', 'kinds'], 'config');
+  known(object, ['tsconfig', 'exclude', 'rules', 'kinds'], 'config');
   if (object.tsconfig !== undefined && typeof object.tsconfig !== 'string') throw new ConfigError('tsconfig: expected a string');
-  const shared = { ...defaultThresholds, ...thresholds(object.thresholds, 'thresholds') };
+  const shared = ruleSettings(object.rules, 'rules', registry);
   const kinds = Object.entries(record(object.kinds ?? {}, 'kinds')).map(([name, value]): Kind => {
     const kind = record(value, `kinds.${name}`);
-    known(kind, ['match', 'dependsOn', 'thresholds'], `kinds.${name}`);
+    known(kind, ['match', 'dependsOn', 'rules'], `kinds.${name}`);
     return {
       name,
       match: strings(kind.match, `kinds.${name}.match`),
       dependsOn: strings(kind.dependsOn ?? [], `kinds.${name}.dependsOn`),
-      thresholds: { ...shared, ...thresholds(kind.thresholds, `kinds.${name}.thresholds`) },
+      rules: resolveRules(registry, shared, ruleSettings(kind.rules, `kinds.${name}.rules`, registry)),
     };
   });
   if (kinds.length === 0) throw new ConfigError('kinds: declare at least one module kind');
@@ -64,6 +63,28 @@ export const isExcluded = (config: Config, file: string): boolean => config.excl
 export const classify = (config: Config, file: string): Kind | undefined =>
   config.kinds.find((kind) => kind.match.some((glob) => matchesGlob(file, glob)));
 
+/** `false` turns a rule off, `true` turns it back on, and an object turns it on with those options. */
+type Setting = { enabled: boolean; options: object };
+
+const ruleSettings = (value: unknown, at: string, registry: ReadonlyMap<string, Rule>): Map<string, Setting> => {
+  const settings = new Map<string, Setting>();
+  for (const [id, setting] of Object.entries(value === undefined ? {} : record(value, at))) {
+    const rule = registry.get(id);
+    if (!rule) throw new ConfigError(`${at}: no rule called ${id}`);
+    if (typeof setting === 'boolean') settings.set(id, { enabled: setting, options: {} });
+    else settings.set(id, { enabled: true, options: rule.parseOptions(record(setting, `${at}.${id}`), `${at}.${id}`) });
+  }
+  return settings;
+};
+
+/** Options layer as defaults, then the shared `rules`, then the kind's `rules`. */
+const resolveRules = (registry: ReadonlyMap<string, Rule>, shared: Map<string, Setting>, own: Map<string, Setting>): EnabledRule[] =>
+  [...registry.values()].flatMap((rule) => {
+    const enabled = own.get(rule.id)?.enabled ?? shared.get(rule.id)?.enabled ?? true;
+    const options = { ...rule.defaults, ...shared.get(rule.id)?.options, ...own.get(rule.id)?.options };
+    return enabled ? [{ rule, options }] : [];
+  });
+
 const record = (value: unknown, at: string): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ConfigError(`${at}: expected an object`);
   return value as Record<string, unknown>;
@@ -75,22 +96,6 @@ const strings = (value: unknown, at: string): string[] => {
     throw new ConfigError(`${at}: expected a string or a list of strings`);
   }
   return list;
-};
-
-const thresholds = (value: unknown, at: string): Partial<Thresholds> => {
-  if (value === undefined) return {};
-  const object = record(value, at);
-  const result: Partial<Thresholds> = {};
-  for (const key of Object.keys(defaultThresholds) as (keyof Thresholds)[]) {
-    if (object[key] === undefined) continue;
-    const number = object[key];
-    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) {
-      throw new ConfigError(`${at}.${key}: expected a whole number of at least 1`);
-    }
-    result[key] = number;
-  }
-  known(object, Object.keys(defaultThresholds), at);
-  return result;
 };
 
 const known = (object: Record<string, unknown>, keys: string[], at: string) => {

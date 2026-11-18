@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { FindingsCache } from '../app/ports.ts';
-import type { Finding } from '../model/rules.ts';
+import type { Finding } from '../model/rule.ts';
 
 /** Keeps findings under the repository's git directory, out of the working tree. */
 export const gitDirCache = (projectRoot: string): FindingsCache => {
