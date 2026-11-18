@@ -46,9 +46,9 @@ describe('import graph', () => {
   });
 
   it('marks an import type-only when every name declares only a type', () => {
-    const hex = join(import.meta.dirname, 'fixtures/hex');
-    const config = parseConfig(JSON.parse(readFileSync(join(hex, 'fitness.config.json'), 'utf8')), builtinRegistry);
-    const order = typescriptAnalyzer.analyze(hex, config).modules.find((module) => module.file === 'src/domain/order.ts');
+    const hexagonalApp = join(import.meta.dirname, 'fixtures/hexagonal-app');
+    const config = parseConfig(JSON.parse(readFileSync(join(hexagonalApp, 'fitness.config.json'), 'utf8')), builtinRegistry);
+    const order = typescriptAnalyzer.analyze(hexagonalApp, config).modules.find((module) => module.file === 'src/domain/order.ts');
     assert.deepEqual(order?.imports.map((edge) => [edge.names, edge.typeOnly]), [[['saveOrder'], false], [['OrderRow'], true]]);
   });
 });

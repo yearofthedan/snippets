@@ -8,7 +8,7 @@ import { parseConfig } from '../src/model/config.ts';
 import { builtinRegistry } from '../src/model/rules/index.ts';
 import type { Finding } from '../src/model/rule.ts';
 
-const root = join(import.meta.dirname, 'fixtures/hex');
+const root = join(import.meta.dirname, 'fixtures/hexagonal-app');
 let findings: Finding[];
 
 before(() => {

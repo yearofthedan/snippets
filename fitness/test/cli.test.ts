@@ -12,11 +12,11 @@ let project: string;
 const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
 const fitness = (...args: string[]) => spawnSync(process.execPath, [cli, ...args], { cwd: project, encoding: 'utf8' });
 
-/** A repo whose project sits in a subdirectory, with one commit of the hex fixture and then a change. */
+/** A repo whose project sits in a subdirectory, with one commit of the hexagonal-app fixture and then a change. */
 before(() => {
   repo = mkdtempSync(join(tmpdir(), 'fitness-test-'));
   project = join(repo, 'app');
-  cpSync(join(import.meta.dirname, 'fixtures/hex'), project, { recursive: true });
+  cpSync(join(import.meta.dirname, 'fixtures/hexagonal-app'), project, { recursive: true });
   git('init', '--quiet');
   git('add', '.');
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'base');
@@ -81,7 +81,7 @@ describe('fitness diff', () => {
     writeFileSync(join(fresh, 'README.md'), 'before\n');
     run(['add', '.']);
     run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'before']);
-    cpSync(join(import.meta.dirname, 'fixtures/hex'), join(fresh, 'app'), { recursive: true });
+    cpSync(join(import.meta.dirname, 'fixtures/hexagonal-app'), join(fresh, 'app'), { recursive: true });
     run(['add', '.']);
     run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'add app']);
     const diffed = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--json'], { cwd: join(fresh, 'app'), encoding: 'utf8' });
