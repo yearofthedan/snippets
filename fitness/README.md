@@ -39,6 +39,58 @@ fitness diff main...          # new or worse findings since the working tree's b
 | `--reporter <name>` | Output format, default `text`. See [Reporters](#reporters). |
 | `--fail` | Exit 1 when there are findings (`check`) or new or worse ones (`diff`). Without it, both exit 0. |
 
+## Set up a project with omp
+
+1. **Install the CLI** from a clone of this repo. If pnpm has no global bin directory yet, run `pnpm setup` first.
+
+   ```sh
+   cd ~/src/snippets/fitness   # wherever the clone is
+   git pull && pnpm install && pnpm build
+   pnpm link --global
+   fitness --help
+   ```
+
+   Run `pnpm build` again after each pull: the linked command runs the built `dist/`.
+
+2. **Add `fitness.config.json`** in the directory you run omp from, next to the project's `tsconfig.json`. A starter
+   for a hexagonal layout, to adjust to the project's folders:
+
+   ```json
+   {
+     "exclude": ["**/*.test.ts", "**/*.spec.ts"],
+     "kinds": {
+       "domain": { "match": "src/domain/**", "dependsOn": [] },
+       "app": { "match": "src/app/**", "dependsOn": ["domain"] },
+       "adapter": { "match": "src/adapters/**", "dependsOn": ["domain", "app"] },
+       "utility": { "match": "src/lib/**", "dependsOn": [] },
+       "entry": { "match": ["src/main.ts", "src/index.ts"], "dependsOn": ["domain", "app", "adapter", "utility"] }
+     }
+   }
+   ```
+
+   Then run `fitness check` and add globs until no `unclassified` findings are left. The other findings it reports are
+   the existing baseline. The omp extension only reports what an edit makes new or worse, so they need no fixing
+   first. Raise or lower the [rule options](#config) where the defaults don't fit, and commit the config.
+
+3. **Load the extension** in that project:
+
+   ```sh
+   mkdir -p .omp/extensions
+   ln -s ~/src/snippets/fitness/integrations/omp/fitness.ts .omp/extensions/fitness.ts
+   ```
+
+   The link points into your clone, so keep it out of git, for example with
+   `echo .omp/extensions/fitness.ts >> .git/info/exclude`. Linking it into `~/.omp/agent/extensions/` instead loads
+   it everywhere; in a project without a config the run fails and the extension stays silent. Two environment
+   variables change what it runs, set where you start omp:
+   - `FITNESS_BASE=main...` reports against where the branch left main, instead of the last commit.
+   - `FITNESS_COMMAND="pnpm exec fitness"` runs a project dev dependency instead of the linked command.
+
+4. **Confirm it works.** With a clean tree, `fitness diff HEAD --reporter omp` prints nothing. Add an import that
+   breaks a `dependsOn` rule, such as a domain module importing an adapter, and run it again: it prints
+   `{"additionalContext": ...}` naming the import. Revert it, start a new omp session (extensions load at session
+   start), and ask omp to make the same edit. Its next reply should take the finding into account.
+
 ## Config
 
 ```json
