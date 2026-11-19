@@ -13,9 +13,15 @@ Needs Node 22.18 or later.
 
 ```sh
 cd fitness
-npm install
-npm run build
-npm link            # puts `fitness` on your PATH
+pnpm install
+pnpm build
+pnpm link --global   # puts `fitness` on your PATH
+```
+
+Or add it to one project as a dev dependency, and run it there with `pnpm exec fitness`:
+
+```sh
+pnpm add -D link:~/src/snippets/fitness
 ```
 
 In the project to check, add a `fitness.config.json` next to its `tsconfig.json`, then:
@@ -163,7 +169,8 @@ To have Claude Code see the delta after each edit without being blocked, add a `
 }
 ```
 
-A non-empty delta prints a `hookSpecificOutput.additionalContext` response, which Claude reads as context for its next
+Where `fitness` is a dev dependency, use `pnpm exec fitness` in the command. A non-empty delta prints a
+`hookSpecificOutput.additionalContext` response, which Claude reads as context for its next
 step.
 
 ### omp
@@ -180,7 +187,8 @@ mkdir -p .omp/extensions
 ln -s ~/src/snippets/fitness/integrations/omp/fitness.ts .omp/extensions/fitness.ts
 ```
 
-Set `FITNESS_BASE=main...` to diff the whole branch, and `FITNESS_COMMAND` when `fitness` is not on the PATH. omp
+Set `FITNESS_BASE=main...` to diff the whole branch, and `FITNESS_COMMAND="pnpm exec fitness"` when `fitness` is a
+dev dependency rather than on the PATH. omp
 loads extensions at session start. The event and result shapes are from `@oh-my-pi/pi-coding-agent` 18.22
 (`dist/types/extensibility/extensions/types.d.ts`).
 

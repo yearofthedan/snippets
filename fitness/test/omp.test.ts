@@ -4,7 +4,7 @@ import fitness, { type Extension } from '../integrations/omp/fitness.ts';
 
 type Handler = Parameters<Extension['on']>[1];
 
-const extension = (stdout: string, code = 0) => {
+const extension = (stdout: string, code = 0, env: Record<string, string> = { FITNESS_BASE: 'main...' }) => {
   const calls: { command: string; args: string[]; cwd?: string }[] = [];
   let handler: Handler | undefined;
   const pi: Extension = {
@@ -16,7 +16,7 @@ const extension = (stdout: string, code = 0) => {
       return { stdout, stderr: '', code };
     },
   };
-  fitness(pi, { FITNESS_BASE: 'main...' });
+  fitness(pi, env);
   return { calls, fire: (toolName: string, isError = false) => handler?.({ toolName, isError }, { cwd: '/repo' }) };
 };
 
@@ -25,6 +25,12 @@ describe('omp extension', () => {
     const { calls, fire } = extension('{"additionalContext":"new: src/a.ts:1"}\n');
     assert.deepEqual(await fire('edit'), { additionalContext: 'new: src/a.ts:1' });
     assert.deepEqual(calls, [{ command: 'fitness', args: ['diff', 'main...', '--reporter', 'omp'], cwd: '/repo' }]);
+  });
+
+  it('runs a command with arguments, such as pnpm exec', async () => {
+    const { calls, fire } = extension('', 0, { FITNESS_COMMAND: 'pnpm exec fitness' });
+    await fire('write');
+    assert.deepEqual(calls.map((call) => [call.command, call.args]), [['pnpm', ['exec', 'fitness', 'diff', 'HEAD', '--reporter', 'omp']]]);
   });
 
   it('skips tools that change no files, failed edits, empty deltas and broken runs', async () => {
