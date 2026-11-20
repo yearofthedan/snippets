@@ -4,7 +4,7 @@ Architectural fitness checks for TypeScript codebases. It builds a model of the 
 kind each module is, and the rules between kinds) and reports findings against it, as text for people, JSON or SARIF
 for tools, and hook responses for coding agents. `diff` reports only what a change made new or worse, so it can run after every edit.
 
-First cut. It covers module kinds, dependency direction, cohesion and cognitive complexity. Import counts, import
+First cut. It covers module kinds, dependency direction, re-exports across kinds, cohesion and cognitive complexity. Import counts, import
 distance, orchestration weight, export surface and fan-in come later.
 
 ## Run it
@@ -98,6 +98,7 @@ fitness diff main...          # new or worse findings since the working tree's b
   "tsconfig": "tsconfig.json",
   "exclude": ["**/*.test.ts"],
   "rules": {
+    "no-cross-kind-reexport": { "allow": [] },
     "module-cohesion": { "maxLines": 200 },
     "function-cohesion": { "maxLines": 40 },
     "cognitive-complexity": { "max": 15 }
@@ -128,7 +129,7 @@ See [`fitness.config.json`](./fitness.config.json) for the config this tool chec
 
 ## Rules
 
-Analysis extracts the facts once for the whole project: the import graph, each module's top-level units and the
+Analysis extracts the facts once for the whole project: the import graph, with re-exports marked, each module's top-level units and the
 links between them, and each function's statements and complexity. Each rule is its own module in
 [`src/model/rules/`](./src/model/rules) that reads those facts for one module at a time, so it stays pure. A rule
 declares its id, its default options and how to validate them, and a `check` that returns findings. Rules are looked
@@ -136,36 +137,21 @@ up in a registry, which is how a project's own rules will join the built-in ones
 wired up yet.
 
 Every finding has a `rule`, a `key` that identifies it across commits, a `value` that `diff` compares, a `message`,
-and `details` an agent can act on.
+`details` an agent can act on, and for built-in rules a `docs` link to the rule's page. The agent reporters list each
+rule's link once after the findings, and SARIF gives it as the rule's `helpUri`.
 
-**`unclassified`**: the module matches no kind. This comes from the model rather than a rule: a module without a kind
-has no rules to run.
+Each rule's page says why it exists, shows code it reports and code it passes, and lists its options:
 
-**`dependency-direction`** (no options; the kind's `dependsOn` sets what it allows): a module imports a kind its own
-kind's `dependsOn` does not list. Named imports resolve
-through barrels and re-exports to the module that declares them, so a domain module importing `../adapters` is
-reported against the adapter file behind the barrel, with the barrel named as the route. Type-only imports
-(`import type`, `import { type X }`, or names that only declare types) are recorded separately on the edge and still
-count. There is one finding per pair of modules. Its value is the number of names imported, so importing more across
-the same boundary counts as worse. When the target kind may depend on the importer's kind, the message advises a port;
-otherwise it advises moving the code or allowing the dependency.
+| Rule | Reports | Options |
+| --- | --- | --- |
+| [`unclassified`](./docs/rules/unclassified.md) | A module that matches no kind. From the model, so it cannot be turned off. | |
+| [`dependency-direction`](./docs/rules/dependency-direction.md) | An import from a kind the importer's kind does not list in `dependsOn`, followed through barrels. | |
+| [`no-cross-kind-reexport`](./docs/rules/no-cross-kind-reexport.md) | A module that re-exports what another kind declares. | `allow` |
+| [`module-cohesion`](./docs/rules/module-cohesion.md) | A module over a size tripwire whose top-level code falls into unrelated groups (LCOM4). | `maxLines` |
+| [`function-cohesion`](./docs/rules/function-cohesion.md) | A function over a size tripwire whose statements fall into unrelated groups. | `maxLines` |
+| [`cognitive-complexity`](./docs/rules/cognitive-complexity.md) | A function harder to follow than `max`, by SonarSource's measure. | `max` |
 
-**`module-cohesion`** (`maxLines`): LCOM4 over a module's top-level code, checked only when the module is over
-`maxLines`. Functions
-and classes are the units. Two units are linked when one references the other, or both reference the same top-level
-state or type declared in the module. Top-level statements that declare nothing count together as one unit. A module
-whose units form one connected group passes at any size. Otherwise the finding lists each group's names and line range,
-which is where to split.
-
-**`function-cohesion`** (`maxLines`): the same measure inside a function over `maxLines`. The units are the body's
-statements, linked when they share a parameter, a local or a `this.<member>`. Parameters count as shared, so guard
-clauses stay attached to the code they guard. Statements that touch none of these are left out. The finding lists the
-groups' line ranges.
-
-**`cognitive-complexity`** (`max`): SonarSource's cognitive complexity for each outermost function, with nested
-functions counted into it. `if`, ternaries, `switch`, loops and `catch` add 1 plus their nesting depth. `else`,
-`else if`, labelled jumps, each run of mixed `&&`/`||`/`??` and direct recursion (a call that resolves to the function
-itself, `this.method()` included) add 1. The finding names the largest increments.
+A new rule gets a page in [`docs/rules/`](./docs/rules) with the same sections, and a row here.
 
 ## Diff
 

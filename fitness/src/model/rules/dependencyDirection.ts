@@ -1,7 +1,7 @@
 import type { Kind } from '../config.ts';
 import type { ImportEdge } from '../facts.ts';
 import { ConfigError, type Finding, type Rule } from '../rule.ts';
-import { title } from './shared.ts';
+import { ruleDocs, title } from './shared.ts';
 
 /**
  * A module may import only from its own kind and the kinds its `dependsOn` lists. One finding per module pair,
@@ -9,6 +9,7 @@ import { title } from './shared.ts';
  */
 export const dependencyDirection: Rule = {
   id: 'dependency-direction',
+  docs: ruleDocs('dependency-direction'),
   defaults: {},
   parseOptions: (raw, at) => {
     if (Object.keys(raw).length > 0) throw new ConfigError(`${at}: takes no options; the kind's dependsOn sets what it allows`);

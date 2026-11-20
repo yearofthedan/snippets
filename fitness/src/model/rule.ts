@@ -12,6 +12,8 @@ export interface Finding {
   value: number;
   limit?: number;
   message: string;
+  /** A link to the rule's documentation: what it flags, why, and how to fix it. */
+  docs?: string;
   details?: unknown;
 }
 
@@ -30,6 +32,8 @@ export interface RuleContext<Options> {
 export interface Rule<Options extends object = object> {
   /** The name the config and findings use. */
   id: string;
+  /** A link to the rule's documentation, attached to its findings. */
+  docs?: string;
   /** Options when the config gives none. */
   defaults: Options;
   /** Validates options from the config, at `at`, returning only the keys given. Throws ConfigError. */

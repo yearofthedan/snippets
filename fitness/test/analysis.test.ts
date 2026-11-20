@@ -42,7 +42,22 @@ describe('import graph', () => {
 
   it('records re-exports as edges from the barrel', () => {
     const edges = modules.get('src/lib/index.ts')?.imports ?? [];
-    assert.deepEqual(edges.map((edge) => [edge.to, edge.names]), [['src/lib/shapes.ts', ['Circle', 'Square']], ['src/lib/shapes.ts', []]]);
+    assert.deepEqual(
+      edges.map((edge) => [edge.to, edge.names, edge.reExport]),
+      [['src/lib/shapes.ts', ['Circle', 'Square'], true], ['src/lib/shapes.ts', [], true]],
+    );
+  });
+
+  it('splits imported names the module exports again from the ones it only uses', () => {
+    const edges = modules.get('src/relay.ts')?.imports ?? [];
+    assert.deepEqual(
+      edges.map((edge) => [edge.to, edge.names, edge.typeOnly, edge.reExport ?? false]),
+      [
+        ['src/lib/shapes.ts', ['Square'], false, true],
+        ['src/lib/shapes.ts', ['unit'], false, false],
+        ['src/lib/shapes.ts', ['Circle'], true, true],
+      ],
+    );
   });
 
   it('marks an import type-only when every name declares only a type', () => {

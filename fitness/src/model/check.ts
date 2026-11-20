@@ -1,6 +1,7 @@
 import { classify, type Config, isExcluded } from './config.ts';
 import type { ModuleFacts, Project } from './facts.ts';
 import type { Finding } from './rule.ts';
+import { ruleDocs } from './rules/shared.ts';
 
 /**
  * Runs each kind's enabled rules over its modules. A module that matches no kind gets an `unclassified` finding
@@ -13,7 +14,9 @@ export const check = (config: Config, project: Project): Finding[] => {
   return modules.flatMap((module) => {
     const kind = kindOf(module.file);
     if (!kind) return [unclassified(module)];
-    return kind.rules.flatMap(({ rule, options }) => rule.check({ module, kind, options, kindOf }));
+    return kind.rules.flatMap(({ rule, options }) =>
+      rule.check({ module, kind, options, kindOf }).map((finding) => (rule.docs ? { ...finding, docs: rule.docs } : finding)),
+    );
   });
 };
 
@@ -26,4 +29,5 @@ const unclassified = (module: ModuleFacts): Finding => ({
   message:
     `${module.file} matches no module kind, so no layer rule or threshold applies to it. ` +
     'Add a glob that covers it to a kind in the fitness config, or move it under an existing kind.',
+  docs: ruleDocs('unclassified'),
 });

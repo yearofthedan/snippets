@@ -29,6 +29,11 @@ export interface ImportEdge {
   names: string[];
   /** `import type`, `import { type X }`, or every imported name declares only a type. */
   typeOnly: boolean;
+  /**
+   * The module passes these names on to its importers: `export ... from`, or an imported name it exports again with
+   * `export { x }` or `export default x`. Such an import gets its own edge, apart from the names it only uses.
+   */
+  reExport?: true;
   line: number;
 }
 

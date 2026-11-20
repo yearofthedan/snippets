@@ -86,7 +86,7 @@ describe('fitness diff', () => {
     run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'add app']);
     const diffed = spawnSync(process.execPath, [cli, 'diff', 'HEAD~1..HEAD', '--reporter', 'json'], { cwd: join(fresh, 'app'), encoding: 'utf8' });
     assert.equal(diffed.status, 0, diffed.stderr);
-    assert.equal(JSON.parse(diffed.stdout).added.length, 7);
+    assert.equal(JSON.parse(diffed.stdout).added.length, 8);
     assert.equal(run(['worktree', 'list']).trim().split('\n').length, 1);
   });
 

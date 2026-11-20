@@ -26,6 +26,7 @@ describe('check', () => {
       'function-cohesion:src/app/handle.ts:handle',
       'module-cohesion:src/app/handle.ts',
       'module-cohesion:src/domain/pricing.ts',
+      'no-cross-kind-reexport:src/app/index.ts->src/domain/order.ts',
       'unclassified:src/stray.ts',
     ]);
   });
@@ -37,6 +38,17 @@ describe('check', () => {
         'This breaks the dependency direction, so the domain should depend on a port it owns for what it needs (saveOrder, OrderRow), ' +
         'and the adapter should implement it.',
     );
+  });
+
+  it('reports a re-export of another kind at the module that passes it on', () => {
+    const finding = byKey('no-cross-kind-reexport:src/app/index.ts->src/domain/order.ts');
+    assert.equal(
+      finding?.message,
+      'App module src/app/index.ts re-exports Order from domain src/domain/order.ts, so its importers reach domain through app. ' +
+        'Have importers that may depend on domain import it from src/domain/order.ts, and give the rest a app API that hides it, ' +
+        "or allow domain in this rule's options if app is meant to expose it.",
+    );
+    assert.equal(finding?.docs, 'https://github.com/yearofthedan/snippets/blob/main/fitness/docs/rules/no-cross-kind-reexport.md');
   });
 
   it('reports the groups a module splits into', () => {

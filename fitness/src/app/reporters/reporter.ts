@@ -19,8 +19,20 @@ export interface Reporter {
 export const actionable = (report: Report): Finding[] =>
   report.mode === 'check' ? report.findings : [...report.delta.added, ...report.delta.worsened];
 
-/** What an agent reads after an edit: the delta for diff, every finding for check. */
-export const agentContext = (report: Report, render: { delta: (delta: Delta) => string; finding: (finding: Finding) => string }): string =>
-  report.mode === 'diff'
-    ? `Architecture fitness changes since the base commit. Address them if this edit caused them:\n${render.delta(report.delta)}`
-    : `Architecture fitness findings:\n${report.findings.map(render.finding).join('\n')}`;
+/**
+ * What an agent reads after an edit: the delta for diff, every finding for check, then a link to each rule's docs
+ * once, so the agent can read why a rule exists and what a fix looks like.
+ */
+export const agentContext = (report: Report, render: { delta: (delta: Delta) => string; finding: (finding: Finding) => string }): string => {
+  const body =
+    report.mode === 'diff'
+      ? `Architecture fitness changes since the base commit. Address them if this edit caused them:\n${render.delta(report.delta)}`
+      : `Architecture fitness findings:\n${report.findings.map(render.finding).join('\n')}`;
+  const docs = ruleDocs(actionable(report));
+  return docs.length === 0 ? body : `${body}\n\nRule docs:\n${docs.map(([rule, url]) => `- ${rule}: ${url}`).join('\n')}`;
+};
+
+/** Each rule's docs link, once per rule, in the order the rules first appear. */
+export const ruleDocs = (findings: Finding[]): [string, string][] => [
+  ...new Map(findings.flatMap((finding): [string, string][] => (finding.docs ? [[finding.rule, finding.docs]] : []))),
+];
