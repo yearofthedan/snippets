@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { before, describe, it } from 'node:test';
@@ -92,6 +92,41 @@ describe('fitness diff', () => {
 
   it('leaves no worktrees behind', () => {
     assert.equal(git('worktree', 'list').trim().split('\n').length, 1);
+  });
+});
+
+describe('fitness diff from a linked checkout', () => {
+  // A copy of fitness itself, as a global `pnpm link` runs it, so a test can edit a built-in rule.
+  let tool: string;
+  let dir: string;
+  const run = (...args: string[]) =>
+    spawnSync(process.execPath, [join(tool, 'src/cli.ts'), ...args], { cwd: dir, encoding: 'utf8' });
+  const cached = () => readdirSync(join(dir, '../.git/fitness-cache'));
+
+  before(() => {
+    tool = mkdtempSync(join(tmpdir(), 'fitness-tool-'));
+    const own = join(import.meta.dirname, '..');
+    cpSync(join(own, 'src'), join(tool, 'src'), { recursive: true });
+    cpSync(join(own, 'package.json'), join(tool, 'package.json'));
+    symlinkSync(join(own, 'node_modules'), join(tool, 'node_modules'));
+
+    const repo = mkdtempSync(join(tmpdir(), 'fitness-linked-'));
+    dir = join(repo, 'app');
+    cpSync(join(import.meta.dirname, 'fixtures/hexagonal-app'), dir, { recursive: true });
+    execFileSync('git', ['init', '--quiet'], { cwd: repo });
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'base'], { cwd: repo });
+  });
+
+  it('redoes a cached base when a built-in rule changes, and drops the old entry', () => {
+    assert.deepEqual(JSON.parse(run('diff', 'HEAD', '--reporter', 'json').stdout).added, []);
+    const [first] = cached();
+    const rule = join(tool, 'src/model/rules/cognitive-complexity/cognitiveComplexity.ts');
+    writeFileSync(rule, readFileSync(rule, 'utf8').replace('key: `cognitive-complexity:${module.file}:${name}`', 'key: `cognitive-complexity:${module.file}#${name}`'));
+    const delta = JSON.parse(run('diff', 'HEAD', '--reporter', 'json').stdout);
+    assert.deepEqual([delta.added, delta.resolved], [[], []]);
+    assert.equal(cached().length, 1);
+    assert.notEqual(cached()[0], first);
   });
 });
 

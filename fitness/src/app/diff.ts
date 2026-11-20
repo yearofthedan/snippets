@@ -31,19 +31,19 @@ export interface DiffRequest {
   config: Config;
   /** Part of the cache key: a digest of the config file and the project's own rules it imports. */
   configDigest?: string;
-  /** Part of the cache key, so a new release of the tool never reuses old findings. */
-  toolVersion: string;
+  /** Part of the cache key: a digest of the tool's own code, so a changed built-in rule never reuses old findings. */
+  toolDigest: string;
 }
 
 /** Checks both sides with the working tree's config, so a delta reflects code changes rather than rule changes. */
 export const diffProject = (
-  { range, root, config, configDigest = '', toolVersion }: DiffRequest,
+  { range, root, config, configDigest = '', toolDigest }: DiffRequest,
   { analyzer, repository, cache }: { analyzer: Analyzer; repository: Repository; cache: FindingsCache },
 ): Delta => {
   const configHash = createHash('sha256').update(JSON.stringify(config)).update(configDigest).digest('hex').slice(0, 16);
   const atCommit = (ref: string): Finding[] => {
     const commit = repository.commit(ref);
-    const key = `${toolVersion}-${configHash}-${commit}-${repository.projectPath().replaceAll('/', '_')}`;
+    const key = `${toolDigest}-${configHash}-${commit}-${repository.projectPath().replaceAll('/', '_')}`;
     const cached = cache.get(key);
     if (cached) return cached;
     const checkout = repository.checkout(commit, config.tsconfig);
@@ -51,6 +51,8 @@ export const diffProject = (
       // A commit from before the project existed has nothing to report.
       const findings = checkout.projectRoot ? checkProject(analyzer, checkout.projectRoot, config) : [];
       cache.set(key, findings);
+      // Entries for another build of the tool can never be hit again.
+      cache.prune((other) => other.startsWith(`${toolDigest}-`));
       return findings;
     } finally {
       checkout.dispose();
