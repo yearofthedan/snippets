@@ -4,6 +4,12 @@
   "private": true,
   "description": "Architectural fitness checks for TypeScript codebases",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "bin": {
     "fitness": "./dist/cli.js"
   },

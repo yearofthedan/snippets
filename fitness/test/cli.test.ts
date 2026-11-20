@@ -95,6 +95,53 @@ describe('fitness diff', () => {
   });
 });
 
+describe('a fitness.config.ts with a plugin', () => {
+  let dir: string;
+  const run = (...args: string[]) => spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: 'utf8' });
+  const commit = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+
+  // Outside any package.json, as a project without "type": "module" would be, and without fitness installed.
+  before(() => {
+    dir = join(mkdtempSync(join(tmpdir(), 'fitness-plugin-')), 'wt');
+    cpSync(join(import.meta.dirname, 'fixtures/custom-rule'), dir, { recursive: true });
+    commit('init', '--quiet');
+    commit('add', '.');
+    commit('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'base');
+  });
+
+  it('is found without --config and runs the plugin rule on the kinds that turn it on', () => {
+    const checked = run('check', '--reporter', 'json');
+    assert.equal(checked.status, 0, checked.stderr);
+    assert.deepEqual(JSON.parse(checked.stdout).findings, [
+      {
+        rule: 'wt/no-ports-through-application',
+        key: 'wt/no-ports-through-application:src/ui/orderForm.ts->src/application/ports/orderStore.ts',
+        file: 'src/ui/orderForm.ts',
+        line: 1,
+        value: 1,
+        message:
+          'src/ui/orderForm.ts reaches the port src/application/ports/orderStore.ts through src/application/index.ts. Call a use case instead of holding the port.',
+        docs: 'https://example.com/rules/no-ports-through-application',
+      },
+    ]);
+  });
+
+  it("redoes a cached base when the plugin's code changes", () => {
+    assert.deepEqual(JSON.parse(run('diff', 'HEAD', '--reporter', 'json').stdout).added, []);
+    const rule = join(dir, 'rules/noPortsThroughApplication.ts');
+    writeFileSync(rule, readFileSync(rule, 'utf8').replace('${module.file}->${edge.to}', '${module.file}=>${edge.to}'));
+    const delta = JSON.parse(run('diff', 'HEAD', '--reporter', 'json').stdout);
+    assert.deepEqual([delta.added, delta.resolved], [[], []]);
+  });
+
+  it('reports a config without a default export', () => {
+    writeFileSync(join(dir, 'empty.config.ts'), 'export const config = {};\n');
+    const checked = run('check', '--config', 'empty.config.ts');
+    assert.equal(checked.status, 2);
+    assert.match(checked.stderr, /fitness config: .*empty.config.ts: expected the config as its default export/);
+  });
+});
+
 describe('fitness check', () => {
   it('exits 1 with --fail when there are findings', () => {
     assert.equal(fitness('check', '--fail').status, 1);

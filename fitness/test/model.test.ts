@@ -91,6 +91,48 @@ describe('parseConfig', () => {
   });
 });
 
+describe('plugins', () => {
+  const imports: Rule<{ limit: number }> = {
+    id: 'max-imports',
+    docs: 'https://example.com/max-imports',
+    defaults: { limit: 10 },
+    parseOptions: wholeNumberOptions({ limit: 10 }),
+    check: ({ module, options }) =>
+      module.imports.length >= options.limit
+        ? [{ rule: 'max-imports', key: `max-imports:${module.file}`, file: module.file, line: 1, value: module.imports.length, message: 'too many' }]
+        : [],
+  };
+  const bare: Rule = { id: 'bare', check: () => [] };
+  const withPlugins = (plugins: unknown, rules: unknown = {}) =>
+    parse({ plugins, rules, kinds: { all: { match: '**', rules: { 'dependency-direction': false } } } });
+
+  it('runs plugin rules under their namespace, with their options validated', () => {
+    const config = withPlugins({ wt: { rules: [imports] } }, { 'wt/max-imports': { limit: 1 } });
+    const findings = check(config, { modules: [moduleWith('a.ts', 'b.ts'), moduleWith('b.ts')] });
+    assert.deepEqual(findings, [
+      { rule: 'wt/max-imports', key: 'wt/max-imports:a.ts', file: 'a.ts', line: 1, value: 1, message: 'too many', docs: 'https://example.com/max-imports' },
+    ]);
+    assert.throws(() => withPlugins({ wt: { rules: [imports] } }, { 'wt/max-imports': { limit: 0 } }), /rules.wt\/max-imports.limit: expected a whole number/);
+    assert.throws(() => withPlugins({ wt: { rules: [imports] } }, { 'max-imports': {} }), /rules: no rule called max-imports/);
+  });
+
+  it('gives no docs link to a rule without one, and refuses options to a rule that declares none', () => {
+    const config = withPlugins({ wt: { rules: [{ ...bare, check: () => [{ rule: 'bare', key: 'k', file: 'a.ts', line: 1, value: 1, message: 'm' }] }] } });
+    assert.equal(check(config, { modules: [moduleWith('a.ts')] })[0].docs, undefined);
+    assert.ok(withPlugins({ wt: { rules: [bare] } }, { 'wt/bare': false }));
+    assert.throws(() => withPlugins({ wt: { rules: [bare] } }, { 'wt/bare': { max: 1 } }), /rules.wt\/bare: unknown key max/);
+  });
+
+  it('refuses duplicate ids, bad names and a plugin given as a path', () => {
+    assert.throws(() => withPlugins({ wt: { rules: [bare, bare] } }), /two rules have the id wt\/bare/);
+    assert.ok(withPlugins({ wt: { rules: [bare] }, other: { rules: [bare] } }));
+    assert.throws(() => withPlugins({ 'w/t': { rules: [bare] } }), /plugins.w\/t: a namespace is/);
+    assert.throws(() => withPlugins({ wt: { rules: [{ ...bare, id: 'x/y' }] } }), /plugins.wt.rules\[0\]: a rule id is/);
+    assert.throws(() => withPlugins({ wt: { rules: [{ id: 'x' }] } }), /x has no check function/);
+    assert.throws(() => withPlugins({ wt: './rules.ts' }), /plugins.wt: expected a plugin, \{ rules: Rule\[\] \}, imported in a fitness.config.ts/);
+  });
+});
+
 describe('components', () => {
   const unit = (name: string, kind: 'function' | 'type') => ({ name, kind, line: 1, endLine: 1 });
 

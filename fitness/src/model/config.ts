@@ -1,5 +1,5 @@
 import { matchesGlob } from 'node:path';
-import { ConfigError, type Rule } from './rule.ts';
+import { ConfigError, namespaced, noOptions, type Plugin, type Rule, registry as withRules } from './rule.ts';
 
 export { ConfigError } from './rule.ts';
 
@@ -23,16 +23,35 @@ export interface Config {
   kinds: Kind[];
 }
 
+/** `false` turns a rule off, `true` turns it back on, and an object turns it on with those options. */
+export type RuleSettings = Record<string, boolean | Record<string, unknown>>;
+
+/** A config as written, in fitness.config.json or as the default export of a fitness.config.ts. */
+export interface FitnessConfig {
+  /** The tsconfig whose files are checked, relative to the config. Default `tsconfig.json`. */
+  tsconfig?: string;
+  exclude?: string | string[];
+  /** A project's own rules by namespace. A rule `x` in plugin `ns` is `ns/x` in `rules`. */
+  plugins?: Record<string, Plugin>;
+  rules?: RuleSettings;
+  kinds: Record<string, { match: string | string[]; dependsOn?: string | string[]; rules?: RuleSettings }>;
+}
+
+/** Types a fitness.config.ts. It returns the config unchanged. */
+export const defineConfig = (config: FitnessConfig): FitnessConfig => config;
+
 const alwaysExcluded = ['**/*.d.ts'];
 
 /**
- * Validates raw JSON from fitness.config.json against the rules in `registry`. Kinds keep their declared order: the
- * first match wins. Every registered rule runs on every kind unless the config turns it off.
+ * Validates a raw config against the rules in `registry` and the config's own plugins. Kinds keep their declared
+ * order: the first match wins. Every registered rule runs on every kind unless the config turns it off.
  */
-export const parseConfig = (raw: unknown, registry: ReadonlyMap<string, Rule>): Config => {
+export const parseConfig = (raw: unknown, builtins: ReadonlyMap<string, Rule>): Config => {
   const object = record(raw, 'config');
-  known(object, ['tsconfig', 'exclude', 'rules', 'kinds'], 'config');
+  known(object, ['tsconfig', 'exclude', 'plugins', 'rules', 'kinds'], 'config');
   if (object.tsconfig !== undefined && typeof object.tsconfig !== 'string') throw new ConfigError('tsconfig: expected a string');
+  const plugins = Object.entries(object.plugins === undefined ? {} : record(object.plugins, 'plugins'));
+  const registry = withRules([...builtins.values(), ...plugins.flatMap(([namespace, plugin]) => namespaced(namespace, plugin, `plugins.${namespace}`))]);
   const shared = ruleSettings(object.rules, 'rules', registry);
   const kinds = Object.entries(record(object.kinds ?? {}, 'kinds')).map(([name, value]): Kind => {
     const kind = record(value, `kinds.${name}`);
@@ -63,7 +82,6 @@ export const isExcluded = (config: Config, file: string): boolean => config.excl
 export const classify = (config: Config, file: string): Kind | undefined =>
   config.kinds.find((kind) => kind.match.some((glob) => matchesGlob(file, glob)));
 
-/** `false` turns a rule off, `true` turns it back on, and an object turns it on with those options. */
 type Setting = { enabled: boolean; options: object };
 
 const ruleSettings = (value: unknown, at: string, registry: ReadonlyMap<string, Rule>): Map<string, Setting> => {
@@ -72,7 +90,7 @@ const ruleSettings = (value: unknown, at: string, registry: ReadonlyMap<string, 
     const rule = registry.get(id);
     if (!rule) throw new ConfigError(`${at}: no rule called ${id}`);
     if (typeof setting === 'boolean') settings.set(id, { enabled: setting, options: {} });
-    else settings.set(id, { enabled: true, options: rule.parseOptions(record(setting, `${at}.${id}`), `${at}.${id}`) });
+    else settings.set(id, { enabled: true, options: (rule.parseOptions ?? noOptions)(record(setting, `${at}.${id}`), `${at}.${id}`) });
   }
   return settings;
 };
@@ -81,7 +99,7 @@ const ruleSettings = (value: unknown, at: string, registry: ReadonlyMap<string, 
 const resolveRules = (registry: ReadonlyMap<string, Rule>, shared: Map<string, Setting>, own: Map<string, Setting>): EnabledRule[] =>
   [...registry.values()].flatMap((rule) => {
     const enabled = own.get(rule.id)?.enabled ?? shared.get(rule.id)?.enabled ?? true;
-    const options = { ...rule.defaults, ...shared.get(rule.id)?.options, ...own.get(rule.id)?.options };
+    const options = { ...(rule.defaults ?? {}), ...shared.get(rule.id)?.options, ...own.get(rule.id)?.options };
     return enabled ? [{ rule, options }] : [];
   });
 
