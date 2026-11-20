@@ -160,3 +160,72 @@ describe('fitness check', () => {
     assert.match(run.stderr, /fitness config: kinds.a.dependsOn: no kind called b/);
   });
 });
+
+describe('rulesets', () => {
+  let dir: string;
+  const run = (...args: string[]) => spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: 'utf8' });
+  const keys = (findings: { key: string }[]) => findings.map((finding) => finding.key).sort();
+  const commit = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+
+  // The hexagonal-app fixture with its config as a TS default export, minus cognitive complexity on app modules, and an
+  // `edit` ruleset that turns it back on there.
+  before(() => {
+    dir = join(mkdtempSync(join(tmpdir(), 'fitness-ruleset-')), 'app');
+    cpSync(join(import.meta.dirname, 'fixtures/hexagonal-app'), dir, { recursive: true });
+    const base = JSON.parse(readFileSync(join(dir, 'fitness.config.json'), 'utf8'));
+    base.kinds.app.rules = { 'cognitive-complexity': false };
+    writeFileSync(
+      join(dir, 'fitness.config.ts'),
+      `const base = ${JSON.stringify(base)};\nexport default base;\n` +
+        'export const edit = [base, { rules: { "module-cohesion": { maxLines: 10 } } }, ' +
+        '{ kinds: { app: { rules: { "cognitive-complexity": true, "function-cohesion": false } } } }];\n' +
+        "export const moved = [base, { kinds: { domain: { rules: {}, dependsOn: ['adapter'] } } }];\n" +
+        'export const helper = 1;\n',
+    );
+    writeFileSync(join(dir, 'package.json'), '{ "type": "module" }\n');
+    commit('init', '--quiet');
+    commit('add', '.');
+    commit('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'base');
+  });
+
+  it('checks with the ruleset merged onto its base', () => {
+    const base = JSON.parse(run('check', '--reporter', 'json').stdout).findings;
+    const edit = JSON.parse(run('check', '--ruleset', 'edit', '--reporter', 'json').stdout).findings;
+    const only = (findings: { key: string }[], others: { key: string }[]) => keys(findings).filter((key) => !keys(others).includes(key));
+    assert.deepEqual(only(base, edit), ['function-cohesion:src/app/handle.ts:handle']);
+    assert.deepEqual(only(edit, base), ['cognitive-complexity:src/app/handle.ts:grade']);
+  });
+
+  it('diffs both sides with the same ruleset, so a rule it turns on adds no findings by itself', () => {
+    // The default run caches the base first, so a ruleset that reused its entry would report grade's complexity as new.
+    assert.deepEqual(JSON.parse(run('diff', 'HEAD', '--reporter', 'json').stdout).added, []);
+    const delta = JSON.parse(run('diff', 'HEAD', '--ruleset', 'edit', '--reporter', 'json').stdout);
+    assert.deepEqual([delta.added, delta.worsened, delta.resolved], [[], [], []]);
+  });
+
+  it('prints the resolved config', () => {
+    const printed = JSON.parse(run('--print-config', '--ruleset', 'edit').stdout);
+    assert.deepEqual(printed.kinds.app.rules['module-cohesion'], { maxLines: 10 });
+    assert.deepEqual(printed.kinds.app.rules['cognitive-complexity'], { max: 4 });
+    assert.equal(printed.kinds.app.rules['function-cohesion'], undefined);
+    assert.deepEqual(printed.kinds.domain.rules['function-cohesion'], { maxLines: 6 });
+  });
+
+  it('lists the rulesets when the name is unknown', () => {
+    const checked = run('check', '--ruleset', 'pr');
+    assert.equal(checked.status, 2);
+    assert.match(checked.stderr, /no ruleset called pr\. Rulesets: edit, moved/);
+  });
+
+  it('refuses an overlay that changes the architecture', () => {
+    const checked = run('check', '--ruleset', 'moved');
+    assert.equal(checked.status, 2);
+    assert.match(checked.stderr, /fitness config: ruleset moved\[1\]\.kinds\.domain: a ruleset overlay sets rules only, not dependsOn/);
+  });
+
+  it('refuses a ruleset for a JSON config', () => {
+    const checked = run('check', '--config', 'fitness.config.json', '--ruleset', 'edit');
+    assert.equal(checked.status, 2);
+    assert.match(checked.stderr, /a JSON config has no rulesets/);
+  });
+});

@@ -27,6 +27,7 @@ export interface DiffRequest {
   range: Range;
   /** The working tree's project directory. */
   root: string;
+  /** Checks both sides. Its resolved rules and options are part of the cache key, so each ruleset caches apart. */
   config: Config;
   /** Part of the cache key: a digest of the config file and the project's own rules it imports. */
   configDigest?: string;

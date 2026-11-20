@@ -36,6 +36,8 @@ fitness diff main...          # new or worse findings since the working tree's b
 | Flag | Effect |
 | --- | --- |
 | `--config <file>` | Config path. The project root is its directory. Default: the first of `fitness.config.ts`, `.mts`, `.js`, `.mjs` and `.json` in the current directory. |
+| `--ruleset <name>` | Check with a [ruleset](#rulesets), a named export of a `fitness.config.ts`. Default: the default export. |
+| `--print-config` | Print the config as resolved, with each kind's rules and options, and exit. Takes `--config` and `--ruleset`. |
 | `--reporter <name>` | Output format, default `text`. See [Reporters](#reporters). |
 | `--fail` | Exit 1 when there are findings (`check`) or new or worse ones (`diff`). Without it, both exit 0. |
 
@@ -81,9 +83,10 @@ fitness diff main...          # new or worse findings since the working tree's b
 
    The link points into your clone, so keep it out of git, for example with
    `echo .omp/extensions/fitness.ts >> .git/info/exclude`. Linking it into `~/.omp/agent/extensions/` instead loads
-   it everywhere; in a project without a config the run fails and the extension stays silent. Two environment
+   it everywhere; in a project without a config the run fails and the extension stays silent. Environment
    variables change what it runs, set where you start omp:
    - `FITNESS_BASE=main...` reports against where the branch left main, instead of the last commit.
+   - `FITNESS_RULESET=edit` checks with a [ruleset](#rulesets) from a `fitness.config.ts`.
    - `FITNESS_COMMAND="pnpm exec fitness"` runs a project dev dependency instead of the linked command.
 
 4. **Confirm it works.** With a clean tree, `fitness diff HEAD --reporter omp` prints nothing. Add an import that
@@ -212,6 +215,52 @@ export default defineConfig({
   `pnpm link --global`, or the dev dependency. Running needs neither.
 - `diff`'s cache key includes the config and every file it imports outside fitness, so editing a rule redoes the base.
 
+## Rulesets
+
+A ruleset checks the same architecture with different rules, such as a stricter limit after each edit, while the
+agent still has the code in context, than at the PR gate. It is a named export of `fitness.config.ts`: a list of the
+base config and overlays, which fitness merges in order.
+
+```ts
+// fitness.config.ts
+import { defineConfig, type Ruleset } from 'fitness';
+
+const base = defineConfig({
+  rules: { 'cognitive-complexity': { max: 15 } },
+  kinds: {
+    domain: { match: 'src/domain/**' },
+    adapter: { match: 'src/adapters/**', dependsOn: ['domain'], rules: { 'module-cohesion': { maxLines: 300 } } },
+  },
+});
+
+export default base;
+
+export const edit = [
+  base,
+  {
+    rules: { 'cognitive-complexity': { max: 12 } },
+    kinds: { adapter: { rules: { 'module-cohesion': false } } },
+  },
+] satisfies Ruleset;
+```
+
+```sh
+fitness diff HEAD --ruleset edit
+fitness --print-config --ruleset edit   # the merged result, per kind
+```
+
+- An overlay sets `rules` only: at the top level, merged by rule id, and under `kinds`, merged by kind name and then
+  rule id. Kinds' globs and `dependsOn`, `exclude`, `tsconfig` and `plugins` stay as the base has them, and an overlay
+  that sets them is refused, as is a kind the base doesn't declare.
+- For the same rule, an overlay's options merge into the base's, `false` turns the rule off, and `true` turns it on
+  and keeps the base's options. After merging, the usual layering applies: defaults, then top-level `rules`, then the
+  kind's.
+- Rulesets are the config's named exports that are lists, so it can export other values too. An unknown name fails
+  and lists the rulesets there are. A JSON config has no rulesets.
+- `diff` checks both sides with the same ruleset, and each ruleset caches its own findings, so switching rulesets
+  never shows up as new findings.
+- No `extends` between rulesets yet: each starts from a base. Share overlays as plain constants if two need the same.
+
 ## Rules
 
 Analysis extracts the facts once for the whole project: the import graph, with re-exports marked, each module's top-level units and the
@@ -284,7 +333,7 @@ To have Claude Code see the delta after each edit without being blocked, add a `
       {
         "matcher": "Edit|MultiEdit|Write",
         "hooks": [
-          { "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && fitness diff HEAD --reporter claude-hook", "timeout": 60 }
+          { "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && fitness diff HEAD --ruleset edit --reporter claude-hook", "timeout": 60 }
         ]
       }
     ]
@@ -292,7 +341,8 @@ To have Claude Code see the delta after each edit without being blocked, add a `
 }
 ```
 
-Where `fitness` is a dev dependency, use `pnpm exec fitness` in the command. A non-empty delta prints a
+Leave out `--ruleset edit` to check with the default config, or keep it with an `edit` [ruleset](#rulesets) in the
+config. Where `fitness` is a dev dependency, use `pnpm exec fitness` in the command. A non-empty delta prints a
 `hookSpecificOutput.additionalContext` response, which Claude reads as context for its next
 step.
 
@@ -310,7 +360,7 @@ mkdir -p .omp/extensions
 ln -s ~/src/snippets/fitness/integrations/omp/fitness.ts .omp/extensions/fitness.ts
 ```
 
-Set `FITNESS_BASE=main...` to diff the whole branch, and `FITNESS_COMMAND="pnpm exec fitness"` when `fitness` is a
+Set `FITNESS_BASE=main...` to diff the whole branch, `FITNESS_RULESET=edit` to check with a [ruleset](#rulesets), and `FITNESS_COMMAND="pnpm exec fitness"` when `fitness` is a
 dev dependency rather than on the PATH. omp
 loads extensions at session start. The event and result shapes are from `@oh-my-pi/pi-coding-agent` 18.22
 (`dist/types/extensibility/extensions/types.d.ts`).
