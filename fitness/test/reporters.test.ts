@@ -5,6 +5,7 @@ import type { Report } from '../src/app/reporters/reporter.ts';
 import type { Finding } from '../src/model/rule.ts';
 
 const finding: Finding = { rule: 'cognitive-complexity', key: 'cognitive-complexity:src/a.ts:f', file: 'src/a.ts', line: 3, value: 20, limit: 15, message: 'Too complex.' };
+const documented: Finding = { ...finding, docs: 'https://example.test/cognitive-complexity.md' };
 const context = { toolVersion: '1.2.3', projectPath: 'app' };
 const render = (id: string, report: Report) => reporters.get(id)?.render(report, context) ?? '';
 const diff = (added: Finding[]): Report => ({ mode: 'diff', delta: { added, worsened: [], resolved: [] } });
@@ -34,5 +35,11 @@ describe('reporters', () => {
     for (const id of ['claude-hook', 'omp']) assert.equal(render(id, diff([])), '');
     assert.match(JSON.parse(render('omp', diff([finding]))).additionalContext, /new: src\/a.ts:3/);
     assert.equal(JSON.parse(render('claude-hook', diff([finding]))).hookSpecificOutput.hookEventName, 'PostToolUse');
+  });
+
+  it("link each rule's docs once", () => {
+    const context = JSON.parse(render('omp', diff([documented, { ...documented, key: 'other' }]))).additionalContext;
+    assert.match(context, /\n\nRule docs:\n- cognitive-complexity: https:\/\/example.test\/cognitive-complexity.md$/);
+    assert.equal(JSON.parse(render('sarif', diff([documented]))).runs[0].tool.driver.rules[0].helpUri, documented.docs);
   });
 });

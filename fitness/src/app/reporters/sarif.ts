@@ -1,5 +1,5 @@
 import type { Finding } from '../../model/rule.ts';
-import { actionable, type ReportContext, type Reporter } from './reporter.ts';
+import { actionable, type ReportContext, type Reporter, ruleDocs } from './reporter.ts';
 
 /**
  * SARIF 2.1.0, the format GitHub code scanning reads to annotate pull requests. Paths are relative to the repository
@@ -9,6 +9,7 @@ export const sarifReporter: Reporter = {
   id: 'sarif',
   render: (report, context) => {
     const findings = actionable(report);
+    const docs = new Map(ruleDocs(findings));
     const rules = [...new Set(findings.map((finding) => finding.rule))].sort();
     return JSON.stringify(
       {
@@ -21,7 +22,7 @@ export const sarifReporter: Reporter = {
                 name: 'fitness',
                 version: context.toolVersion,
                 informationUri: 'https://github.com/yearofthedan/snippets/tree/main/fitness',
-                rules: rules.map((id) => ({ id, shortDescription: { text: id } })),
+                rules: rules.map((id) => ({ id, shortDescription: { text: id }, ...(docs.has(id) ? { helpUri: docs.get(id) } : {}) })),
               },
             },
             results: findings.map((finding) => result(finding, context)),

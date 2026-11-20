@@ -1,6 +1,6 @@
 {
   "tsconfig": "tsconfig.json",
-  "exclude": ["test/**"],
+  "exclude": ["test/**", "**/*.test.ts"],
   "kinds": {
     "model": { "match": "src/model/**", "dependsOn": [] },
     "app": { "match": "src/app/**", "dependsOn": ["model"] },

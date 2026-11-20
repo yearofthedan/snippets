@@ -39,8 +39,8 @@ describe('parseConfig', () => {
       },
     });
     const ids = (index: number) => config.kinds[index].rules.map((enabled) => enabled.rule.id);
-    assert.deepEqual(ids(0), ['dependency-direction', 'module-cohesion']);
-    assert.deepEqual(ids(1), ['dependency-direction', 'module-cohesion', 'function-cohesion', 'cognitive-complexity']);
+    assert.deepEqual(ids(0), ['dependency-direction', 'no-cross-kind-reexport', 'module-cohesion']);
+    assert.deepEqual(ids(1), ['dependency-direction', 'no-cross-kind-reexport', 'module-cohesion', 'function-cohesion', 'cognitive-complexity']);
   });
 
   it('runs a rule registered beside the built-in ones', () => {
@@ -71,7 +71,6 @@ describe('parseConfig', () => {
       () => parse({ kinds: { app: { match: 'src/**', rules: { 'module-cohesion': { maxLoc: 1 } } } } }),
       /kinds.app.rules.module-cohesion: unknown key maxLoc/,
     );
-    assert.throws(() => parse({ rules: { 'dependency-direction': { strict: 1 } }, kinds: { app: { match: 'src/**' } } }), /takes no options/);
   });
 
   it('refuses an unknown key at the top level or in a kind', () => {
@@ -118,19 +117,5 @@ describe('diff', () => {
     assert.deepEqual(delta.added.map((f) => f.key), ['fresh']);
     assert.deepEqual(delta.worsened.map((f) => [f.key, f.was]), [['worse', 3]]);
     assert.deepEqual(delta.resolved.map((f) => f.key), ['gone']);
-  });
-});
-
-describe('dependency direction', () => {
-  const module = moduleWith;
-
-  it('advises moving the code when neither kind may depend on the other', () => {
-    const config = parse({ kinds: { billing: { match: 'src/billing/**' }, shipping: { match: 'src/shipping/**' } } });
-    const [finding] = check(config, { modules: [module('src/billing/a.ts', 'src/shipping/b.ts'), module('src/shipping/b.ts')] });
-    assert.equal(
-      finding.message,
-      'Billing module src/billing/a.ts imports shipping src/shipping/b.ts. Billing may depend only on itself, ' +
-        'so move what it needs into billing (x), or allow billing -> shipping in the config if the dependency is intended.',
-    );
   });
 });
