@@ -194,6 +194,13 @@ describe('fitness check', () => {
     assert.equal(run.status, 2);
     assert.match(run.stderr, /fitness config: kinds.a.dependsOn: no kind called b/);
   });
+
+  it('exits 1 rather than 2 when a claude-hook run fails, so the hook warns without blocking', () => {
+    writeFileSync(join(project, 'bad.json'), '{"kinds": {}}');
+    for (const reporter of ['--reporter=claude-hook', '--reporter claude-hook']) {
+      assert.equal(fitness('check', '--config', 'bad.json', ...reporter.split(' ')).status, 1);
+    }
+  });
 });
 
 describe('rulesets', () => {

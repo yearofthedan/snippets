@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { components } from '../src/model/components.ts';
 import { check } from '../src/model/check.ts';
-import { classify, type Config, ConfigError, parseConfig } from '../src/model/config.ts';
+import { classify, type Config, parseConfig, registry } from '../src/model/config.ts';
 import { mergeRuleset } from '../src/model/ruleset.ts';
 import { diff } from '../src/model/diff.ts';
-import { type Finding, type Rule, registry, wholeNumberOptions } from '../src/model/rule.ts';
-import { builtinRegistry, builtinRules } from '../src/model/rules/index.ts';
+import { ConfigError, type Finding, type Rule, wholeNumberOptions } from '../src/model/rule.ts';
+import { builtinRules } from '../src/model/rules/index.ts';
+import { builtinRegistry } from '../src/builtins.ts';
 
 const moduleWith = (file: string, to?: string) => ({
   file,

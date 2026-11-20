@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { check } from '../../check.ts';
 import { type Config, parseConfig } from '../../config.ts';
 import type { ModuleFacts } from '../../facts.ts';
-import { builtinRegistry } from '../index.ts';
+import { builtinRegistry } from '../../../builtins.ts';
 
 const rule = 'no-cross-kind-reexport';
 

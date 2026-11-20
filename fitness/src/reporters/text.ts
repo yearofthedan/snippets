@@ -1,5 +1,5 @@
-import type { Delta } from '../../model/diff.ts';
-import type { Finding } from '../../model/rule.ts';
+import type { Delta } from '../model/diff.ts';
+import type { Finding } from '../model/rule.ts';
 import type { Reporter } from './reporter.ts';
 
 export const textReporter: Reporter = {

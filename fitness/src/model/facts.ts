@@ -3,6 +3,7 @@
  * Rules read only these facts, so they stay independent of the compiler that produced them.
  */
 
+/** The modules a check reads: every file the tsconfig includes, less the config's exclusions. */
 export interface Project {
   modules: ModuleFacts[];
 }

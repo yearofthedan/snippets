@@ -5,14 +5,15 @@ import { parseArgs } from 'node:util';
 import { typescriptAnalyzer } from './analysis/typescript.ts';
 import { checkProject } from './app/check.ts';
 import { diffProject, parseRange } from './app/diff.ts';
-import { reporters } from './app/reporters/index.ts';
-import { actionable, type Report } from './app/reporters/reporter.ts';
+import { builtinRegistry, unclassifiedDocs } from './builtins.ts';
 import { findConfig, loadConfig } from './config/loadConfig.ts';
 import { toolDigest } from './config/toolDigest.ts';
 import { gitDirCache } from './git/cache.ts';
 import { gitRepository, projectPathOf } from './git/repository.ts';
-import { type Config, ConfigError, parseConfig } from './model/config.ts';
-import { builtinRegistry } from './model/rules/index.ts';
+import { type Config, parseConfig } from './model/config.ts';
+import { ConfigError } from './model/rule.ts';
+import { reporters } from './reporters/index.ts';
+import { actionable, type Report } from './reporters/reporter.ts';
 
 const usage = `usage:
   fitness check [--config <file>] [--ruleset <name>] [--reporter <name>] [--fail]
@@ -62,7 +63,7 @@ const resolveConfig = async (options: Omit<Options, 'reporter' | 'fail'>) => {
   const configFile = realpathSync(options.config ? resolve(options.config) : findConfig(process.cwd()));
   const { raw, digest } = await loadConfig(configFile, options.ruleset);
   try {
-    return { root: dirname(configFile), config: parseConfig(raw, builtinRegistry), digest };
+    return { root: dirname(configFile), config: parseConfig(raw, builtinRegistry, { unclassifiedDocs }), digest };
   } catch (error) {
     if (error instanceof ConfigError && options.ruleset !== undefined) throw new ConfigError(`ruleset ${options.ruleset}: ${error.message}`);
     throw error;
@@ -72,11 +73,15 @@ const resolveConfig = async (options: Omit<Options, 'reporter' | 'fail'>) => {
 const run = async (options: Options, produce: Produce): Promise<number> => {
   const reporter = reporters.get(options.reporter);
   if (!reporter) throw new Error(`no reporter called ${options.reporter}: use one of ${[...reporters.keys()].join(', ')}`);
-  const { root, config, digest } = await resolveConfig(options);
-  const report = produce(root, config, digest);
-  const output = reporter.render(report, { toolVersion: version(), projectPath: projectPathOf(root) });
-  if (output) console.log(output);
-  return options.fail && actionable(report).length > 0 ? 1 : 0;
+  try {
+    const { root, config, digest } = await resolveConfig(options);
+    const report = produce(root, config, digest);
+    const output = reporter.render(report, { toolVersion: version(), projectPath: projectPathOf(root) });
+    if (output) console.log(output);
+    return options.fail && actionable(report).length > 0 ? 1 : 0;
+  } catch (error) {
+    return failed(error, reporter.failureExitCode);
+  }
 };
 
 /** The config after defaults, the ruleset's overlays and each kind's own rules: what each kind is checked with. */
@@ -98,12 +103,14 @@ const delta = (range: string, root: string, config: Config, configDigest: string
 
 const version = (): string => JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
+/** Says why the run failed and returns the exit code: the reporter's when there is one, else 2. */
+const failed = (error: unknown, exitCode = 2): number => {
+  console.error(error instanceof ConfigError ? `fitness config: ${error.message}` : error instanceof Error ? error.message : error);
+  return exitCode;
+};
+
 try {
   process.exitCode = await main(process.argv.slice(2));
 } catch (error) {
-  console.error(error instanceof ConfigError ? `fitness config: ${error.message}` : error instanceof Error ? error.message : error);
-  // Claude Code treats exit 2 from a hook as blocking feedback; a broken run should only warn.
-  const argv = process.argv;
-  const hook = argv.some((arg, index) => arg === '--reporter=claude-hook' || (arg === '--reporter' && argv[index + 1] === 'claude-hook'));
-  process.exitCode = hook ? 1 : 2;
+  process.exitCode = failed(error);
 }

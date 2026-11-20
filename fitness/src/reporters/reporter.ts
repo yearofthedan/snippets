@@ -1,5 +1,5 @@
-import type { Delta } from '../../model/diff.ts';
-import type { Finding } from '../../model/rule.ts';
+import type { Delta } from '../model/diff.ts';
+import type { Finding } from '../model/rule.ts';
 
 export type Report = { mode: 'check'; findings: Finding[] } | { mode: 'diff'; delta: Delta };
 
@@ -13,6 +13,8 @@ export interface ReportContext {
 export interface Reporter {
   id: string;
   render: (report: Report, context: ReportContext) => string;
+  /** The exit code when the run fails before there is a report to render. Default 2. */
+  failureExitCode?: number;
 }
 
 /** The findings a report asks someone to act on: all of them for check, the new and worse ones for diff. */

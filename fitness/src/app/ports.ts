@@ -1,9 +1,10 @@
-import type { Config } from '../model/config.ts';
+import type { AnalysisScope } from '../model/config.ts';
 import type { Project } from '../model/facts.ts';
 import type { Finding } from '../model/rule.ts';
 
 export interface Analyzer {
-  analyze(root: string, config: Config): Project;
+  /** The facts of the files in scope. Excluded files are left out, so nothing downstream sees them. */
+  analyze(root: string, scope: AnalysisScope): Project;
 }
 
 /** A git repository holding the project. */

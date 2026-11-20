@@ -1,26 +1,12 @@
 import { matchesGlob } from 'node:path';
-import { ConfigError, namespaced, noOptions, type Plugin, type Rule, registry as withRules } from './rule.ts';
-
-export { ConfigError } from './rule.ts';
-
-export interface EnabledRule {
-  rule: Rule;
-  options: object;
-}
-
-export interface Kind {
-  name: string;
-  match: string[];
-  /** Kinds this kind may import from. Its own kind is always allowed. */
-  dependsOn: string[];
-  /** The rules that run on this kind's modules, with their options resolved. */
-  rules: EnabledRule[];
-}
+import { ConfigError, type EnabledRule, type Kind, noOptions, type Plugin, type Rule } from './rule.ts';
 
 export interface Config {
   tsconfig: string;
   exclude: string[];
   kinds: Kind[];
+  /** A link to the page on `unclassified` findings, which the model reports rather than a rule. */
+  unclassifiedDocs?: string;
 }
 
 /** `false` turns a rule off, `true` turns it back on, and an object turns it on with those options. */
@@ -40,19 +26,54 @@ export interface FitnessConfig {
 /** Types a fitness.config.ts. It returns the config unchanged. */
 export const defineConfig = (config: FitnessConfig): FitnessConfig => config;
 
+/** Rules by id. Built-in rules come first; a project's own rules join them under namespaced ids. */
+export const registry = (rules: readonly Rule[]): ReadonlyMap<string, Rule> => {
+  const byId = new Map<string, Rule>();
+  for (const rule of rules) {
+    if (byId.has(rule.id)) throw new ConfigError(`rules: two rules have the id ${rule.id}`);
+    byId.set(rule.id, rule);
+  }
+  return byId;
+};
+
+const name = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * A plugin's rules under `namespace/`. Their findings get the namespaced rule id, and keys prefixed by the namespace,
+ * so they can't collide with a built-in rule's or another plugin's.
+ */
+export const namespaced = (namespace: string, plugin: unknown, at: string): Rule[] => {
+  if (!name.test(namespace)) throw new ConfigError(`${at}: a namespace is lowercase letters, digits and dashes`);
+  const rules = typeof plugin === 'object' && plugin !== null ? (plugin as { rules?: unknown }).rules : undefined;
+  if (!Array.isArray(rules)) throw new ConfigError(`${at}: expected a plugin, { rules: Rule[] }, imported in a fitness.config.ts`);
+  return rules.map((rule: Rule, index): Rule => {
+    if (typeof rule?.id !== 'string' || !name.test(rule.id)) {
+      throw new ConfigError(`${at}.rules[${index}]: a rule id is lowercase letters, digits and dashes`);
+    }
+    if (typeof rule.check !== 'function') throw new ConfigError(`${at}.rules[${index}]: ${rule.id} has no check function`);
+    const id = `${namespace}/${rule.id}`;
+    return {
+      ...rule,
+      id,
+      check: (context) => rule.check(context).map((finding) => ({ ...finding, rule: id, key: `${namespace}/${finding.key}` })),
+    };
+  });
+};
+
 const alwaysExcluded = ['**/*.d.ts'];
 
 /**
  * Validates a raw config against the rules in `registry` and the config's own plugins. Kinds keep their declared
  * order: the first match wins. Every registered rule runs on every kind unless the config turns it off.
+ * `unclassifiedDocs` comes from whoever ships the rules, as their own `docs` links do.
  */
-export const parseConfig = (raw: unknown, builtins: ReadonlyMap<string, Rule>): Config => {
+export const parseConfig = (raw: unknown, builtins: ReadonlyMap<string, Rule>, { unclassifiedDocs }: { unclassifiedDocs?: string } = {}): Config => {
   const object = record(raw, 'config');
   known(object, ['tsconfig', 'exclude', 'plugins', 'rules', 'kinds'], 'config');
   if (object.tsconfig !== undefined && typeof object.tsconfig !== 'string') throw new ConfigError('tsconfig: expected a string');
   const plugins = Object.entries(object.plugins === undefined ? {} : record(object.plugins, 'plugins'));
-  const registry = withRules([...builtins.values(), ...plugins.flatMap(([namespace, plugin]) => namespaced(namespace, plugin, `plugins.${namespace}`))]);
-  const shared = ruleSettings(object.rules, 'rules', registry);
+  const rules = registry([...builtins.values(), ...plugins.flatMap(([namespace, plugin]) => namespaced(namespace, plugin, `plugins.${namespace}`))]);
+  const shared = ruleSettings(object.rules, 'rules', rules);
   const kinds = Object.entries(record(object.kinds ?? {}, 'kinds')).map(([name, value]): Kind => {
     const kind = record(value, `kinds.${name}`);
     known(kind, ['match', 'dependsOn', 'rules'], `kinds.${name}`);
@@ -60,7 +81,7 @@ export const parseConfig = (raw: unknown, builtins: ReadonlyMap<string, Rule>): 
       name,
       match: strings(kind.match, `kinds.${name}.match`),
       dependsOn: strings(kind.dependsOn ?? [], `kinds.${name}.dependsOn`),
-      rules: resolveRules(registry, shared, ruleSettings(kind.rules, `kinds.${name}.rules`, registry)),
+      rules: resolveRules(rules, shared, ruleSettings(kind.rules, `kinds.${name}.rules`, rules)),
     };
   });
   if (kinds.length === 0) throw new ConfigError('kinds: declare at least one module kind');
@@ -74,10 +95,14 @@ export const parseConfig = (raw: unknown, builtins: ReadonlyMap<string, Rule>): 
     tsconfig: typeof object.tsconfig === 'string' ? object.tsconfig : 'tsconfig.json',
     exclude: [...alwaysExcluded, ...strings(object.exclude ?? [], 'exclude')],
     kinds,
+    ...(unclassifiedDocs ? { unclassifiedDocs } : {}),
   };
 };
 
-export const isExcluded = (config: Config, file: string): boolean => config.exclude.some((glob) => matchesGlob(file, glob));
+/** Which files analysis reads: the tsconfig's, less the excluded ones. */
+export type AnalysisScope = Pick<Config, 'tsconfig' | 'exclude'>;
+
+export const isExcluded = ({ exclude }: Pick<AnalysisScope, 'exclude'>, file: string): boolean => exclude.some((glob) => matchesGlob(file, glob));
 
 export const classify = (config: Config, file: string): Kind | undefined =>
   config.kinds.find((kind) => kind.match.some((glob) => matchesGlob(file, glob)));

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ConfigError } from '../model/config.ts';
+import { ConfigError } from '../model/rule.ts';
 import { mergeRuleset } from '../model/ruleset.ts';
 
 /** Looked for in this order when no config is named. */
