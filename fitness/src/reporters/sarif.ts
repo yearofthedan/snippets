@@ -1,4 +1,4 @@
-import type { Finding } from '../../model/rule.ts';
+import type { Finding } from '../model/rule.ts';
 import { actionable, type ReportContext, type Reporter, ruleDocs } from './reporter.ts';
 
 /**

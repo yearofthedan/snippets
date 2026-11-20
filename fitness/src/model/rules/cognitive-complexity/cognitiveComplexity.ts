@@ -1,12 +1,11 @@
 import { type Rule, wholeNumberOptions } from '../../rule.ts';
-import { ruleDocs, withOrdinals } from '../shared.ts';
+import { withOrdinals } from '../shared.ts';
 
 const defaults = { max: 15 };
 
 /** Each outermost function's cognitive complexity, with nested functions counted into it, may be at most `max`. */
 export const cognitiveComplexity: Rule<typeof defaults> = {
   id: 'cognitive-complexity',
-  docs: ruleDocs('cognitive-complexity'),
   defaults,
   parseOptions: wholeNumberOptions(defaults),
   check: ({ module, options }) =>

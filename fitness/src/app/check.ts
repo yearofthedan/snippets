@@ -4,4 +4,4 @@ import type { Finding } from '../model/rule.ts';
 import type { Analyzer } from './ports.ts';
 
 export const checkProject = (analyzer: Analyzer, root: string, config: Config): Finding[] =>
-  check(config, analyzer.analyze(root, config));
+  check(config, analyzer.analyze(root, { tsconfig: config.tsconfig, exclude: config.exclude }));

@@ -1,5 +1,18 @@
-import type { Kind } from './config.ts';
 import type { ModuleFacts } from './facts.ts';
+
+export interface EnabledRule {
+  rule: Rule;
+  options: object;
+}
+
+export interface Kind {
+  name: string;
+  match: string[];
+  /** Kinds this kind may import from. Its own kind is always allowed. */
+  dependsOn: string[];
+  /** The rules that run on this kind's modules, with their options resolved. */
+  rules: EnabledRule[];
+}
 
 export interface Finding {
   /** The id of the rule that reported it, or `unclassified`. */
@@ -53,40 +66,6 @@ export interface Plugin {
 export class ConfigError extends Error {
   override name = 'ConfigError';
 }
-
-/** Rules by id. Built-in rules come first; a project's own rules join them under namespaced ids. */
-export const registry = (rules: readonly Rule[]): ReadonlyMap<string, Rule> => {
-  const byId = new Map<string, Rule>();
-  for (const rule of rules) {
-    if (byId.has(rule.id)) throw new ConfigError(`rules: two rules have the id ${rule.id}`);
-    byId.set(rule.id, rule);
-  }
-  return byId;
-};
-
-const name = /^[a-z][a-z0-9-]*$/;
-
-/**
- * A plugin's rules under `namespace/`. Their findings get the namespaced rule id, and keys prefixed by the namespace,
- * so they can't collide with a built-in rule's or another plugin's.
- */
-export const namespaced = (namespace: string, plugin: unknown, at: string): Rule[] => {
-  if (!name.test(namespace)) throw new ConfigError(`${at}: a namespace is lowercase letters, digits and dashes`);
-  const rules = typeof plugin === 'object' && plugin !== null ? (plugin as { rules?: unknown }).rules : undefined;
-  if (!Array.isArray(rules)) throw new ConfigError(`${at}: expected a plugin, { rules: Rule[] }, imported in a fitness.config.ts`);
-  return rules.map((rule: Rule, index): Rule => {
-    if (typeof rule?.id !== 'string' || !name.test(rule.id)) {
-      throw new ConfigError(`${at}.rules[${index}]: a rule id is lowercase letters, digits and dashes`);
-    }
-    if (typeof rule.check !== 'function') throw new ConfigError(`${at}.rules[${index}]: ${rule.id} has no check function`);
-    const id = `${namespace}/${rule.id}`;
-    return {
-      ...rule,
-      id,
-      check: (context) => rule.check(context).map((finding) => ({ ...finding, rule: id, key: `${namespace}/${finding.key}` })),
-    };
-  });
-};
 
 /** The parseOptions of a rule that declares none: it takes no options. */
 export const noOptions = (raw: Record<string, unknown>, at: string): Partial<object> => {

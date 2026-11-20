@@ -270,8 +270,9 @@ declares its id, its default options and how to validate them, and a `check` tha
 up in a registry, where a project's [own rules](#custom-rules) join the built-in ones.
 
 Every finding has a `rule`, a `key` that identifies it across commits, a `value` that `diff` compares, a `message`,
-`details` an agent can act on, and for built-in rules a `docs` link to the rule's page. The agent reporters list each
-rule's link once after the findings, and SARIF gives it as the rule's `helpUri`.
+`details` an agent can act on, and for built-in rules a `docs` link to the rule's page. The rules don't know where
+their pages are published: [`src/builtins.ts`](./src/builtins.ts) attaches the links where the CLI composes them. The
+agent reporters list each rule's link once after the findings, and SARIF gives it as the rule's `helpUri`.
 
 Each rule's page says why it exists, shows code it reports and code it passes, and lists its options:
 
@@ -305,7 +306,7 @@ still share a name get `#2`, `#3` in order of appearance.
 ## Reporters
 
 A reporter turns a check or diff result into output. Each is its own module in
-[`src/app/reporters/`](./src/app/reporters), looked up by name.
+[`src/reporters/`](./src/reporters), looked up by name.
 
 | Reporter | Output |
 | --- | --- |

@@ -5,14 +5,14 @@ import { before, describe, it } from 'node:test';
 import { typescriptAnalyzer } from '../src/analysis/typescript.ts';
 import { checkProject } from '../src/app/check.ts';
 import { parseConfig } from '../src/model/config.ts';
-import { builtinRegistry } from '../src/model/rules/index.ts';
+import { builtinRegistry, unclassifiedDocs } from '../src/builtins.ts';
 import type { Finding } from '../src/model/rule.ts';
 
 const root = join(import.meta.dirname, 'fixtures/hexagonal-app');
 let findings: Finding[];
 
 before(() => {
-  findings = checkProject(typescriptAnalyzer, root, parseConfig(JSON.parse(readFileSync(join(root, 'fitness.config.json'), 'utf8')), builtinRegistry));
+  findings = checkProject(typescriptAnalyzer, root, parseConfig(JSON.parse(readFileSync(join(root, 'fitness.config.json'), 'utf8')), builtinRegistry, { unclassifiedDocs }));
 });
 
 const byKey = (key: string) => findings.find((finding) => finding.key === key);
@@ -49,6 +49,10 @@ describe('check', () => {
         "or allow domain in this rule's options if app is meant to expose it.",
     );
     assert.equal(finding?.docs, 'https://github.com/yearofthedan/snippets/blob/main/fitness/src/model/rules/no-cross-kind-reexport/README.md');
+  });
+
+  it('links an unclassified module to the page on kinds', () => {
+    assert.equal(byKey('unclassified:src/stray.ts')?.docs, 'https://github.com/yearofthedan/snippets/blob/main/fitness/docs/unclassified.md');
   });
 
   it('reports the groups a module splits into', () => {

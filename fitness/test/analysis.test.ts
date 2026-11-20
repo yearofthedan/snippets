@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { typescriptAnalyzer } from '../src/analysis/typescript.ts';
 import { parseConfig } from '../src/model/config.ts';
-import { builtinRegistry } from '../src/model/rules/index.ts';
+import { builtinRegistry } from '../src/builtins.ts';
 import type { ModuleFacts } from '../src/model/facts.ts';
 
 const root = join(import.meta.dirname, 'fixtures/facts');

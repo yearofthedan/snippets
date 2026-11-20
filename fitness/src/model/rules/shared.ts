@@ -21,11 +21,3 @@ export const withOrdinals = <T extends { name: string }>(functions: T[]): [T, st
 };
 
 export const title = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1);
-
-const source = 'https://github.com/yearofthedan/snippets/blob/main/fitness';
-
-/** Where a built-in rule's documentation lives, linked from its findings: the README in the rule's folder. */
-export const ruleDocs = (id: string): string => `${source}/src/model/rules/${id}/README.md`;
-
-/** The page for `unclassified`, which the model reports rather than a rule. */
-export const unclassifiedDocs = `${source}/docs/unclassified.md`;

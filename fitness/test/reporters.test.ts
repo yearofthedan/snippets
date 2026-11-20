@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { reporters } from '../src/app/reporters/index.ts';
-import type { Report } from '../src/app/reporters/reporter.ts';
+import { reporters } from '../src/reporters/index.ts';
+import type { Report } from '../src/reporters/reporter.ts';
 import type { Finding } from '../src/model/rule.ts';
 
 const finding: Finding = { rule: 'cognitive-complexity', key: 'cognitive-complexity:src/a.ts:f', file: 'src/a.ts', line: 3, value: 20, limit: 15, message: 'Too complex.' };

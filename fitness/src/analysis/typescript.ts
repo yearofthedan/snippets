@@ -1,7 +1,7 @@
 import { join, relative, sep } from 'node:path';
 import { API } from 'typescript/sync';
 import type { Analyzer } from '../app/ports.ts';
-import { type Config, isExcluded } from '../model/config.ts';
+import { type AnalysisScope, isExcluded } from '../model/config.ts';
 import type { ModuleFacts, Project } from '../model/facts.ts';
 import { importEdges, type Resolver } from './imports.ts';
 import { countLines, readSource } from './source.ts';
@@ -9,10 +9,10 @@ import { functionFacts, moduleUnits } from './units.ts';
 
 /** Builds the project model with the TypeScript 7 compiler API, which runs the native compiler in a child process. */
 export const typescriptAnalyzer: Analyzer = {
-  analyze(root: string, config: Config): Project {
+  analyze(root: string, scope: AnalysisScope): Project {
     const api = new API({ cwd: root });
     try {
-      const tsconfig = join(root, config.tsconfig);
+      const tsconfig = join(root, scope.tsconfig);
       const snapshot = api.createSnapshot({ openProjects: [tsconfig] });
       const project = snapshot.getConfiguredProject(tsconfig);
       if (!project) throw new Error(`could not load ${tsconfig}`);
@@ -28,7 +28,7 @@ export const typescriptAnalyzer: Analyzer = {
 
       const modules: ModuleFacts[] = [];
       for (const [fileName, file] of files) {
-        if (isExcluded(config, file)) continue;
+        if (isExcluded(scope, file)) continue;
         const sourceFile = program.getSourceFile(fileName);
         if (!sourceFile) continue;
         const source = readSource(checker, sourceFile, file);

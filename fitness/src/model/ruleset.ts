@@ -1,4 +1,5 @@
-import { ConfigError, type FitnessConfig, record, type RuleSettings } from './config.ts';
+import { type FitnessConfig, record, type RuleSettings } from './config.ts';
+import { ConfigError } from './rule.ts';
 
 /** What a ruleset changes on top of its base: rules only, never the kinds' globs or dependencies. */
 export interface RulesetOverlay {

@@ -1,7 +1,6 @@
-import type { Kind } from '../../config.ts';
 import type { ImportEdge } from '../../facts.ts';
-import { ConfigError, type Finding, type Rule } from '../../rule.ts';
-import { ruleDocs, title } from '../shared.ts';
+import { ConfigError, type Finding, type Kind, type Rule } from '../../rule.ts';
+import { title } from '../shared.ts';
 
 export interface NoCrossKindReexportOptions {
   /** Kinds this kind may re-export from, such as the kinds a composition root wires together. */
@@ -15,7 +14,6 @@ export interface NoCrossKindReexportOptions {
  */
 export const noCrossKindReexport: Rule<NoCrossKindReexportOptions> = {
   id: 'no-cross-kind-reexport',
-  docs: ruleDocs('no-cross-kind-reexport'),
   defaults: { allow: [] },
   parseOptions: (raw, at) => {
     const unknown = Object.keys(raw).filter((key) => key !== 'allow');
