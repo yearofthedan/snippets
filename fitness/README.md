@@ -294,8 +294,10 @@ rule changes. With three dots, `<base>...<head>`, the base is where `<head>` (or
 `<base>`, as in git. A base commit where the project's tsconfig does not exist yet counts as having no findings.
 
 A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
-findings are cached under `.git/fitness-cache/` by commit, config (with the custom rules it imports) and tool version, so repeated runs against the same
-base only analyse the head. Without a head, the head is the working tree.
+findings are cached under `.git/fitness-cache/` by commit, config (with the custom rules it imports) and a digest of
+fitness's own code and TypeScript version, so repeated runs against the same base only analyse the head, and a linked
+checkout that edits a built-in rule redoes the base. Each new entry prunes those from other builds of fitness and those
+unread for 30 days. Without a head, the head is the working tree.
 
 A finding is new when its key is absent at the base, and worse when its value rose. Findings in a renamed file or
 function count as new. Function findings are keyed by name, and a callback is named after its call and a string first

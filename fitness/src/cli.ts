@@ -8,6 +8,7 @@ import { diffProject, parseRange } from './app/diff.ts';
 import { reporters } from './app/reporters/index.ts';
 import { actionable, type Report } from './app/reporters/reporter.ts';
 import { findConfig, loadConfig } from './config/loadConfig.ts';
+import { toolDigest } from './config/toolDigest.ts';
 import { gitDirCache } from './git/cache.ts';
 import { gitRepository, projectPathOf } from './git/repository.ts';
 import { type Config, ConfigError, parseConfig } from './model/config.ts';
@@ -91,7 +92,7 @@ const printConfig = async (options: Omit<Options, 'reporter' | 'fail'>): Promise
 
 const delta = (range: string, root: string, config: Config, configDigest: string) =>
   diffProject(
-    { range: parseRange(range), root, config, configDigest, toolVersion: version() },
+    { range: parseRange(range), root, config, configDigest, toolDigest: toolDigest() },
     { analyzer: typescriptAnalyzer, repository: gitRepository(root), cache: gitDirCache(root) },
   );
 

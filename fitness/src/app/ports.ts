@@ -25,4 +25,6 @@ export interface Repository {
 export interface FindingsCache {
   get(key: string): Finding[] | undefined;
   set(key: string, findings: Finding[]): void;
+  /** Drops every entry `keep` rejects, and any the cache's own policy deems stale. */
+  prune(keep: (key: string) => boolean): void;
 }
