@@ -103,7 +103,7 @@ const resolveRules = (registry: ReadonlyMap<string, Rule>, shared: Map<string, S
     return enabled ? [{ rule, options }] : [];
   });
 
-const record = (value: unknown, at: string): Record<string, unknown> => {
+export const record = (value: unknown, at: string): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ConfigError(`${at}: expected an object`);
   return value as Record<string, unknown>;
 };

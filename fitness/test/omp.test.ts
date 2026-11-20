@@ -33,6 +33,12 @@ describe('omp extension', () => {
     assert.deepEqual(calls.map((call) => [call.command, call.args]), [['pnpm', ['exec', 'fitness', 'diff', 'HEAD', '--reporter', 'omp']]]);
   });
 
+  it('passes a ruleset', async () => {
+    const { calls, fire } = extension('', 0, { FITNESS_RULESET: 'edit' });
+    await fire('edit');
+    assert.deepEqual(calls[0].args, ['diff', 'HEAD', '--ruleset', 'edit', '--reporter', 'omp']);
+  });
+
   it('skips tools that change no files, failed edits, empty deltas and broken runs', async () => {
     assert.equal(await extension('{}').fire('read'), undefined);
     assert.equal(await extension('{}').fire('write', true), undefined);
