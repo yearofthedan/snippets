@@ -40,63 +40,6 @@ export interface FitnessConfig {
 /** Types a fitness.config.ts. It returns the config unchanged. */
 export const defineConfig = (config: FitnessConfig): FitnessConfig => config;
 
-/** What a ruleset changes on top of its base: rules only, never the kinds' globs or dependencies. */
-export interface RulesetOverlay {
-  rules?: RuleSettings;
-  kinds?: Record<string, { rules: RuleSettings }>;
-}
-
-/** A named export of a fitness.config.ts: a base config and the overlays fitness merges onto it, in order. */
-export type Ruleset = readonly [FitnessConfig, ...RulesetOverlay[]];
-
-/**
- * Merges a ruleset into one config as written. Top-level `rules` merge by rule id, and a kind's `rules` merge by kind
- * name and then rule id. An overlay's options merge into the base's for the same rule, `false` turns the rule off,
- * and `true` turns it on and keeps the base's options. Anything else in an overlay is refused: the architecture is the
- * same in every ruleset, only what is checked against it changes.
- */
-export const mergeRuleset = (ruleset: unknown, at: string): Record<string, unknown> => {
-  if (!Array.isArray(ruleset) || ruleset.length === 0) throw new ConfigError(`${at}: expected a ruleset, [config, ...overlays]`);
-  const [base, ...overlays] = ruleset;
-  return overlays.reduce<Record<string, unknown>>((config, overlay, index) => applyOverlay(config, overlay, `${at}[${index + 1}]`), record(base, `${at}[0]`));
-};
-
-const applyOverlay = (config: Record<string, unknown>, value: unknown, at: string): Record<string, unknown> => {
-  const overlay = record(value, at);
-  onlyRules(overlay, ['rules', 'kinds'], at);
-  const kinds = record(config.kinds ?? {}, 'kinds');
-  const changed = Object.entries(overlay.kinds === undefined ? {} : record(overlay.kinds, `${at}.kinds`)).map(([name, value]) => {
-    const kind = record(value, `${at}.kinds.${name}`);
-    onlyRules(kind, ['rules'], `${at}.kinds.${name}`);
-    if (!(name in kinds)) throw new ConfigError(`${at}.kinds: no kind called ${name} in the base config`);
-    const own = record(kinds[name], `kinds.${name}`);
-    return [name, { ...own, rules: mergeRules(own.rules, kind.rules, `${at}.kinds.${name}.rules`) }];
-  });
-  return {
-    ...config,
-    ...(overlay.rules === undefined ? {} : { rules: mergeRules(config.rules, overlay.rules, `${at}.rules`) }),
-    kinds: { ...kinds, ...Object.fromEntries(changed) },
-  };
-};
-
-const mergeRules = (base: unknown, overlay: unknown, at: string): Record<string, unknown> => {
-  const merged = { ...(base === undefined ? {} : record(base, at)) };
-  for (const [id, setting] of Object.entries(overlay === undefined ? {} : record(overlay, at))) {
-    const was = merged[id];
-    const isOptions = (value: unknown) => typeof value === 'object' && value !== null;
-    if (setting === true && isOptions(was)) continue;
-    merged[id] = isOptions(setting) && isOptions(was) ? { ...(was as object), ...(setting as object) } : setting;
-  }
-  return merged;
-};
-
-const onlyRules = (object: Record<string, unknown>, keys: string[], at: string) => {
-  const unknown = Object.keys(object).filter((key) => !keys.includes(key));
-  if (unknown.length > 0) {
-    throw new ConfigError(`${at}: a ruleset overlay sets rules only, not ${unknown.join(', ')}. Change those in the base config.`);
-  }
-};
-
 const alwaysExcluded = ['**/*.d.ts'];
 
 /**
@@ -160,7 +103,7 @@ const resolveRules = (registry: ReadonlyMap<string, Rule>, shared: Map<string, S
     return enabled ? [{ rule, options }] : [];
   });
 
-const record = (value: unknown, at: string): Record<string, unknown> => {
+export const record = (value: unknown, at: string): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ConfigError(`${at}: expected an object`);
   return value as Record<string, unknown>;
 };

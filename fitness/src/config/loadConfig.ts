@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ConfigError, mergeRuleset } from '../model/config.ts';
+import { ConfigError } from '../model/config.ts';
+import { mergeRuleset } from '../model/ruleset.ts';
 
 /** Looked for in this order when no config is named. */
 export const configNames = ['fitness.config.ts', 'fitness.config.mts', 'fitness.config.js', 'fitness.config.mjs', 'fitness.config.json'];

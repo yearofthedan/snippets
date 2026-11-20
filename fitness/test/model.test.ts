@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { components } from '../src/model/components.ts';
 import { check } from '../src/model/check.ts';
-import { classify, type Config, ConfigError, mergeRuleset, parseConfig } from '../src/model/config.ts';
+import { classify, type Config, ConfigError, parseConfig } from '../src/model/config.ts';
+import { mergeRuleset } from '../src/model/ruleset.ts';
 import { diff } from '../src/model/diff.ts';
 import { type Finding, type Rule, registry, wholeNumberOptions } from '../src/model/rule.ts';
 import { builtinRegistry, builtinRules } from '../src/model/rules/index.ts';
@@ -184,6 +185,19 @@ describe('mergeRuleset', () => {
     assert.deepEqual(merged.rules, { 'cognitive-complexity': { max: 12 }, 'module-cohesion': false, 'function-cohesion': true });
     assert.deepEqual(merged.kinds, base.kinds);
     assert.deepEqual(merged.exclude, base.exclude);
+  });
+
+  it("keeps a rule's options while an overlay turns it off, so a later true brings them back", () => {
+    const merged = mergeRuleset(
+      [
+        base,
+        { rules: { 'cognitive-complexity': false }, kinds: { adapter: { rules: { 'module-cohesion': false } } } },
+        { rules: { 'cognitive-complexity': true }, kinds: { adapter: { rules: { 'module-cohesion': true } } } },
+      ],
+      'r',
+    );
+    assert.deepEqual((merged.rules as Record<string, unknown>)['cognitive-complexity'], { max: 15 });
+    assert.deepEqual((merged.kinds as typeof base.kinds).adapter.rules, { 'module-cohesion': { maxLines: 300 } });
   });
 
   it("merges a kind's rules by kind name, keeping its globs, dependencies and the kinds' order", () => {
