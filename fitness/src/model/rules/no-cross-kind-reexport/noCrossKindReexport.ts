@@ -1,7 +1,7 @@
-import type { Kind } from '../config.ts';
-import type { ImportEdge } from '../facts.ts';
-import { ConfigError, type Finding, type Rule } from '../rule.ts';
-import { ruleDocs, title } from './shared.ts';
+import type { Kind } from '../../config.ts';
+import type { ImportEdge } from '../../facts.ts';
+import { ConfigError, type Finding, type Rule } from '../../rule.ts';
+import { ruleDocs, title } from '../shared.ts';
 
 export interface NoCrossKindReexportOptions {
   /** Kinds this kind may re-export from, such as the kinds a composition root wires together. */

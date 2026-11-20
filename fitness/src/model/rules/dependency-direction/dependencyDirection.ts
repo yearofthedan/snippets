@@ -1,7 +1,7 @@
-import type { Kind } from '../config.ts';
-import type { ImportEdge } from '../facts.ts';
-import { ConfigError, type Finding, type Rule } from '../rule.ts';
-import { ruleDocs, title } from './shared.ts';
+import type { Kind } from '../../config.ts';
+import type { ImportEdge } from '../../facts.ts';
+import { ConfigError, type Finding, type Rule } from '../../rule.ts';
+import { ruleDocs, title } from '../shared.ts';
 
 /**
  * A module may import only from its own kind and the kinds its `dependsOn` lists. One finding per module pair,

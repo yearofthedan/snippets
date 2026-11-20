@@ -7,10 +7,10 @@ import { diff } from '../src/model/diff.ts';
 import { type Finding, type Rule, registry, wholeNumberOptions } from '../src/model/rule.ts';
 import { builtinRegistry, builtinRules } from '../src/model/rules/index.ts';
 
-const moduleWith = (file: string, to?: string, reExport?: true) => ({
+const moduleWith = (file: string, to?: string) => ({
   file,
   lines: 1,
-  imports: to ? [{ from: file, to, specifier: to, names: ['x'], typeOnly: false, ...(reExport ? { reExport } : {}), line: 2 }] : [],
+  imports: to ? [{ from: file, to, specifier: to, names: ['x'], typeOnly: false, line: 2 }] : [],
   units: { units: [], links: [] },
   functions: [],
 });
@@ -71,7 +71,6 @@ describe('parseConfig', () => {
       () => parse({ kinds: { app: { match: 'src/**', rules: { 'module-cohesion': { maxLoc: 1 } } } } }),
       /kinds.app.rules.module-cohesion: unknown key maxLoc/,
     );
-    assert.throws(() => parse({ rules: { 'dependency-direction': { strict: 1 } }, kinds: { app: { match: 'src/**' } } }), /takes no options/);
   });
 
   it('refuses an unknown key at the top level or in a kind', () => {
@@ -118,50 +117,5 @@ describe('diff', () => {
     assert.deepEqual(delta.added.map((f) => f.key), ['fresh']);
     assert.deepEqual(delta.worsened.map((f) => [f.key, f.was]), [['worse', 3]]);
     assert.deepEqual(delta.resolved.map((f) => f.key), ['gone']);
-  });
-});
-
-describe('dependency direction', () => {
-  const module = moduleWith;
-
-  it('advises moving the code when neither kind may depend on the other', () => {
-    const config = parse({ kinds: { billing: { match: 'src/billing/**' }, shipping: { match: 'src/shipping/**' } } });
-    const [finding] = check(config, { modules: [module('src/billing/a.ts', 'src/shipping/b.ts'), module('src/shipping/b.ts')] });
-    assert.equal(
-      finding.message,
-      'Billing module src/billing/a.ts imports shipping src/shipping/b.ts. Billing may depend only on itself, ' +
-        'so move what it needs into billing (x), or allow billing -> shipping in the config if the dependency is intended.',
-    );
-  });
-});
-
-describe('no cross-kind re-export', () => {
-  const kinds = (allow?: unknown) =>
-    parse({
-      kinds: {
-        domain: { match: 'src/domain/**' },
-        app: { match: 'src/app/**', dependsOn: ['domain'], ...(allow ? { rules: { 'no-cross-kind-reexport': { allow } } } : {}) },
-      },
-    });
-  const rule = 'no-cross-kind-reexport';
-  const keys = (config: Config, ...modules: ReturnType<typeof moduleWith>[]) =>
-    check(config, { modules: [...modules, moduleWith('src/domain/d.ts'), moduleWith('src/app/b.ts')] })
-      .filter((f) => f.rule === rule)
-      .map((f) => f.key);
-
-  it('flags a re-export of another kind, even one the kind may depend on', () => {
-    assert.deepEqual(keys(kinds(), moduleWith('src/app/a.ts', 'src/domain/d.ts', true)), [`${rule}:src/app/a.ts->src/domain/d.ts`]);
-  });
-
-  it('passes a plain import and a re-export within the kind', () => {
-    assert.deepEqual(keys(kinds(), moduleWith('src/app/a.ts', 'src/domain/d.ts'), moduleWith('src/app/c.ts', 'src/app/b.ts', true)), []);
-  });
-
-  it("passes a re-export from a kind the kind's options allow", () => {
-    assert.deepEqual(keys(kinds('domain'), moduleWith('src/app/a.ts', 'src/domain/d.ts', true)), []);
-  });
-
-  it('refuses an allow that is not kind names', () => {
-    assert.throws(() => kinds([1]), /kinds.app.rules.no-cross-kind-reexport.allow: expected a kind name/);
   });
 });

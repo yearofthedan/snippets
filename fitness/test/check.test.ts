@@ -48,7 +48,7 @@ describe('check', () => {
         'Have importers that may depend on domain import it from src/domain/order.ts, and give the rest a app API that hides it, ' +
         "or allow domain in this rule's options if app is meant to expose it.",
     );
-    assert.equal(finding?.docs, 'https://github.com/yearofthedan/snippets/blob/main/fitness/docs/rules/no-cross-kind-reexport.md');
+    assert.equal(finding?.docs, 'https://github.com/yearofthedan/snippets/blob/main/fitness/src/model/rules/no-cross-kind-reexport/README.md');
   });
 
   it('reports the groups a module splits into', () => {

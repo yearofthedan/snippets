@@ -144,14 +144,15 @@ Each rule's page says why it exists, shows code it reports and code it passes, a
 
 | Rule | Reports | Options |
 | --- | --- | --- |
-| [`unclassified`](./docs/rules/unclassified.md) | A module that matches no kind. From the model, so it cannot be turned off. | |
-| [`dependency-direction`](./docs/rules/dependency-direction.md) | An import from a kind the importer's kind does not list in `dependsOn`, followed through barrels. | |
-| [`no-cross-kind-reexport`](./docs/rules/no-cross-kind-reexport.md) | A module that re-exports what another kind declares. | `allow` |
-| [`module-cohesion`](./docs/rules/module-cohesion.md) | A module over a size tripwire whose top-level code falls into unrelated groups (LCOM4). | `maxLines` |
-| [`function-cohesion`](./docs/rules/function-cohesion.md) | A function over a size tripwire whose statements fall into unrelated groups. | `maxLines` |
-| [`cognitive-complexity`](./docs/rules/cognitive-complexity.md) | A function harder to follow than `max`, by SonarSource's measure. | `max` |
+| [`unclassified`](./docs/unclassified.md) | A module that matches no kind. From the model, so it cannot be turned off. | |
+| [`dependency-direction`](./src/model/rules/dependency-direction/README.md) | An import from a kind the importer's kind does not list in `dependsOn`, followed through barrels. | |
+| [`no-cross-kind-reexport`](./src/model/rules/no-cross-kind-reexport/README.md) | A module that re-exports what another kind declares. | `allow` |
+| [`module-cohesion`](./src/model/rules/module-cohesion/README.md) | A module over a size tripwire whose top-level code falls into unrelated groups (LCOM4). | `maxLines` |
+| [`function-cohesion`](./src/model/rules/function-cohesion/README.md) | A function over a size tripwire whose statements fall into unrelated groups. | `maxLines` |
+| [`cognitive-complexity`](./src/model/rules/cognitive-complexity/README.md) | A function harder to follow than `max`, by SonarSource's measure. | `max` |
 
-A new rule gets a page in [`docs/rules/`](./docs/rules) with the same sections, and a row here.
+Each rule is a folder in [`src/model/rules/`](./src/model/rules): the rule module, its unit tests, and its page as
+the folder's `README.md`. A new rule gets a folder like these, with the same sections in its page, and a row here.
 
 ## Diff
 

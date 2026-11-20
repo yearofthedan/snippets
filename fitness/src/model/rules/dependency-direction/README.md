@@ -62,5 +62,5 @@ None. The kind's `dependsOn` sets what it allows.
 For a kind with no direction to keep, such as tests or scripts. Give it a `dependsOn` that lists every kind it may
 reach, or turn the rule off for that kind.
 
-See also [`no-cross-kind-reexport`](./no-cross-kind-reexport.md), which reports the module that re-exports another
+See also [`no-cross-kind-reexport`](../no-cross-kind-reexport/README.md), which reports the module that re-exports another
 kind, where this rule reports each importer.

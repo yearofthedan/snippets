@@ -1,6 +1,6 @@
-import { components } from '../components.ts';
-import { type Rule, wholeNumberOptions } from '../rule.ts';
-import { group, ruleDocs, withOrdinals } from './shared.ts';
+import { components } from '../../components.ts';
+import { type Rule, wholeNumberOptions } from '../../rule.ts';
+import { group, ruleDocs, withOrdinals } from '../shared.ts';
 
 const defaults = { maxLines: 40 };
 

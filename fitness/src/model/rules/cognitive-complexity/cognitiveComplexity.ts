@@ -1,5 +1,5 @@
-import { type Rule, wholeNumberOptions } from '../rule.ts';
-import { ruleDocs, withOrdinals } from './shared.ts';
+import { type Rule, wholeNumberOptions } from '../../rule.ts';
+import { ruleDocs, withOrdinals } from '../shared.ts';
 
 const defaults = { max: 15 };
 
