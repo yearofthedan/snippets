@@ -1,0 +1,276 @@
+# fitness
+
+Architectural fitness checks for TypeScript codebases. It builds a model of the codebase (the import graph, which
+kind each module is, and the rules between kinds) and reports findings against it, as text for people, JSON or SARIF
+for tools, and hook responses for coding agents. `diff` reports only what a change made new or worse, so it can run after every edit.
+
+First cut. It covers module kinds, dependency direction, cohesion and cognitive complexity. Import counts, import
+distance, orchestration weight, export surface and fan-in come later.
+
+## Run it
+
+Needs Node 22.18 or later.
+
+```sh
+cd fitness
+pnpm install
+pnpm build
+pnpm link --global   # puts `fitness` on your PATH
+```
+
+Or add it to one project as a dev dependency, and run it there with `pnpm exec fitness`:
+
+```sh
+pnpm add -D link:~/src/snippets/fitness
+```
+
+In the project to check, add a `fitness.config.json` next to its `tsconfig.json`, then:
+
+```sh
+fitness check                 # every finding in the working tree
+fitness diff HEAD             # new or worse findings in the working tree since HEAD
+fitness diff main..feature    # new or worse findings between two refs
+fitness diff main...          # new or worse findings since the working tree's branch left main
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--config <file>` | Config path. The project root is its directory. Default `fitness.config.json`. |
+| `--reporter <name>` | Output format, default `text`. See [Reporters](#reporters). |
+| `--fail` | Exit 1 when there are findings (`check`) or new or worse ones (`diff`). Without it, both exit 0. |
+
+## Set up a project with omp
+
+1. **Install the CLI** from a clone of this repo. If pnpm has no global bin directory yet, run `pnpm setup` first.
+
+   ```sh
+   cd ~/src/snippets/fitness   # wherever the clone is
+   git pull && pnpm install && pnpm build
+   pnpm link --global
+   fitness --help
+   ```
+
+   Run `pnpm build` again after each pull: the linked command runs the built `dist/`.
+
+2. **Add `fitness.config.json`** in the directory you run omp from, next to the project's `tsconfig.json`. A starter
+   for a hexagonal layout, to adjust to the project's folders:
+
+   ```json
+   {
+     "exclude": ["**/*.test.ts", "**/*.spec.ts"],
+     "kinds": {
+       "domain": { "match": "src/domain/**", "dependsOn": [] },
+       "app": { "match": "src/app/**", "dependsOn": ["domain"] },
+       "adapter": { "match": "src/adapters/**", "dependsOn": ["domain", "app"] },
+       "utility": { "match": "src/lib/**", "dependsOn": [] },
+       "entry": { "match": ["src/main.ts", "src/index.ts"], "dependsOn": ["domain", "app", "adapter", "utility"] }
+     }
+   }
+   ```
+
+   Then run `fitness check` and add globs until no `unclassified` findings are left. The other findings it reports are
+   the existing baseline. The omp extension only reports what an edit makes new or worse, so they need no fixing
+   first. Raise or lower the [rule options](#config) where the defaults don't fit, and commit the config.
+
+3. **Load the extension** in that project:
+
+   ```sh
+   mkdir -p .omp/extensions
+   ln -s ~/src/snippets/fitness/integrations/omp/fitness.ts .omp/extensions/fitness.ts
+   ```
+
+   The link points into your clone, so keep it out of git, for example with
+   `echo .omp/extensions/fitness.ts >> .git/info/exclude`. Linking it into `~/.omp/agent/extensions/` instead loads
+   it everywhere; in a project without a config the run fails and the extension stays silent. Two environment
+   variables change what it runs, set where you start omp:
+   - `FITNESS_BASE=main...` reports against where the branch left main, instead of the last commit.
+   - `FITNESS_COMMAND="pnpm exec fitness"` runs a project dev dependency instead of the linked command.
+
+4. **Confirm it works.** With a clean tree, `fitness diff HEAD --reporter omp` prints nothing. Add an import that
+   breaks a `dependsOn` rule, such as a domain module importing an adapter, and run it again: it prints
+   `{"additionalContext": ...}` naming the import. Revert it, start a new omp session (extensions load at session
+   start), and ask omp to make the same edit. Its next reply should take the finding into account.
+
+## Config
+
+```json
+{
+  "tsconfig": "tsconfig.json",
+  "exclude": ["**/*.test.ts"],
+  "rules": {
+    "module-cohesion": { "maxLines": 200 },
+    "function-cohesion": { "maxLines": 40 },
+    "cognitive-complexity": { "max": 15 }
+  },
+  "kinds": {
+    "domain": { "match": "src/domain/**", "dependsOn": [] },
+    "app": { "match": "src/app/**", "dependsOn": ["domain"] },
+    "adapter": {
+      "match": ["src/adapters/**"],
+      "dependsOn": ["domain", "app"],
+      "rules": { "module-cohesion": { "maxLines": 300 }, "function-cohesion": false }
+    },
+    "utility": { "match": "src/lib/**", "dependsOn": [] }
+  }
+}
+```
+
+- `kinds` are checked in the order written and the first whose `match` glob fits a file wins, so put narrow globs
+  first. A kind may always import from itself.
+- Every rule runs on every kind. `rules` at the top level sets options for all kinds, and a kind's own `rules`
+  overrides them. `false` turns a rule off, and `true` turns it back on for a kind. The options shown are the defaults.
+- Unknown keys, rules and options are refused, so a misspelling fails loudly. Limits are whole numbers of at least 1.
+- `exclude` removes files from the model entirely. Declaration files are always excluded.
+- The files checked are the ones the tsconfig includes. A solution-style tsconfig with only `references` is not
+  followed: point `tsconfig` at a project config.
+
+See [`fitness.config.json`](./fitness.config.json) for the config this tool checks itself with.
+
+## Rules
+
+Analysis extracts the facts once for the whole project: the import graph, each module's top-level units and the
+links between them, and each function's statements and complexity. Each rule is its own module in
+[`src/model/rules/`](./src/model/rules) that reads those facts for one module at a time, so it stays pure. A rule
+declares its id, its default options and how to validate them, and a `check` that returns findings. Rules are looked
+up in a registry, which is how a project's own rules will join the built-in ones; loading them from the config is not
+wired up yet.
+
+Every finding has a `rule`, a `key` that identifies it across commits, a `value` that `diff` compares, a `message`,
+and `details` an agent can act on.
+
+**`unclassified`**: the module matches no kind. This comes from the model rather than a rule: a module without a kind
+has no rules to run.
+
+**`dependency-direction`** (no options; the kind's `dependsOn` sets what it allows): a module imports a kind its own
+kind's `dependsOn` does not list. Named imports resolve
+through barrels and re-exports to the module that declares them, so a domain module importing `../adapters` is
+reported against the adapter file behind the barrel, with the barrel named as the route. Type-only imports
+(`import type`, `import { type X }`, or names that only declare types) are recorded separately on the edge and still
+count. There is one finding per pair of modules. Its value is the number of names imported, so importing more across
+the same boundary counts as worse. When the target kind may depend on the importer's kind, the message advises a port;
+otherwise it advises moving the code or allowing the dependency.
+
+**`module-cohesion`** (`maxLines`): LCOM4 over a module's top-level code, checked only when the module is over
+`maxLines`. Functions
+and classes are the units. Two units are linked when one references the other, or both reference the same top-level
+state or type declared in the module. Top-level statements that declare nothing count together as one unit. A module
+whose units form one connected group passes at any size. Otherwise the finding lists each group's names and line range,
+which is where to split.
+
+**`function-cohesion`** (`maxLines`): the same measure inside a function over `maxLines`. The units are the body's
+statements, linked when they share a parameter, a local or a `this.<member>`. Parameters count as shared, so guard
+clauses stay attached to the code they guard. Statements that touch none of these are left out. The finding lists the
+groups' line ranges.
+
+**`cognitive-complexity`** (`max`): SonarSource's cognitive complexity for each outermost function, with nested
+functions counted into it. `if`, ternaries, `switch`, loops and `catch` add 1 plus their nesting depth. `else`,
+`else if`, labelled jumps, each run of mixed `&&`/`||`/`??` and direct recursion (a call that resolves to the function
+itself, `this.method()` included) add 1. The finding names the largest increments.
+
+## Diff
+
+`diff <base>[..<head>]` checks both sides with the working tree's config, so a delta reflects code changes, never
+rule changes. With three dots, `<base>...<head>`, the base is where `<head>` (or the working tree's `HEAD`) left
+`<base>`, as in git. A base commit where the project's tsconfig does not exist yet counts as having no findings.
+
+A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
+findings are cached under `.git/fitness-cache/` by commit, config and tool version, so repeated runs against the same
+base only analyse the head. Without a head, the head is the working tree.
+
+A finding is new when its key is absent at the base, and worse when its value rose. Findings in a renamed file or
+function count as new. Function findings are keyed by name, and a callback is named after its call and a string first
+argument, such as `<callback to it("saves an order")>`, so a key survives edits elsewhere in the file. Functions that
+still share a name get `#2`, `#3` in order of appearance.
+
+## Reporters
+
+A reporter turns a check or diff result into output. Each is its own module in
+[`src/app/reporters/`](./src/app/reporters), looked up by name.
+
+| Reporter | Output |
+| --- | --- |
+| `text` | One line per finding, then a count. For `diff`, findings are marked `new` or `worse (was N)`. |
+| `json` | `{ findings }` for `check`; `{ added, worsened, resolved }` for `diff`. Each finding has the same `message`. |
+| `sarif` | SARIF 2.1.0 for GitHub code scanning: the findings to act on, with paths from the repository root. |
+| `claude-hook` | A Claude Code PostToolUse hook response, or nothing when there is nothing to act on. |
+| `omp` | An omp `tool_result` handler result, or nothing when there is nothing to act on. |
+
+"To act on" means every finding for `check` and the new and worse ones for `diff`. With `--reporter claude-hook`, an
+error exits 1 rather than 2, which Claude Code would treat as blocking feedback.
+
+`diff HEAD` measures uncommitted changes, so a commit resets the baseline. To measure the whole branch instead, diff
+against where it left main, `main...`, in any of the agent setups below.
+
+### Claude Code
+
+To have Claude Code see the delta after each edit without being blocked, add a `PostToolUse` hook to the project's
+`.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          { "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && fitness diff HEAD --reporter claude-hook", "timeout": 60 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Where `fitness` is a dev dependency, use `pnpm exec fitness` in the command. A non-empty delta prints a
+`hookSpecificOutput.additionalContext` response, which Claude reads as context for its next
+step.
+
+### omp
+
+[`integrations/omp/fitness.ts`](./integrations/omp/fitness.ts) is an omp extension. After each successful `edit`,
+`write`, `ast_edit` or `apply_patch`, it runs `fitness diff HEAD --reporter omp` in the session's directory and returns
+the result from its `tool_result` handler. omp sends a handler's `additionalContext` with the next request to the
+model, outside the tool result, and the edit itself is never blocked. A failed run is left out of the context.
+
+Install it for one project, or for every project under `~/.omp/agent/extensions/` instead:
+
+```sh
+mkdir -p .omp/extensions
+ln -s ~/src/snippets/fitness/integrations/omp/fitness.ts .omp/extensions/fitness.ts
+```
+
+Set `FITNESS_BASE=main...` to diff the whole branch, and `FITNESS_COMMAND="pnpm exec fitness"` when `fitness` is a
+dev dependency rather than on the PATH. omp
+loads extensions at session start. The event and result shapes are from `@oh-my-pi/pi-coding-agent` 18.22
+(`dist/types/extensibility/extensions/types.d.ts`).
+
+### GitHub code scanning
+
+```yaml
+permissions:
+  security-events: write
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - run: fitness diff origin/${{ github.base_ref }}... --reporter sarif > fitness.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: fitness.sarif
+```
+
+Each result's `partialFingerprints` holds the finding's key, so code scanning tracks a finding across commits the
+same way `diff` does.
+
+## Compiler
+
+Analysis uses the TypeScript 7.1 API (`typescript/sync`), pinned to `7.1.0-beta`, which runs the native compiler in a
+child process. A spike confirmed it gives the AST, module resolution, and checker symbols with alias resolution, which
+is what resolving through barrels needs, so ts-morph and a 5.x/6.x compiler were not needed. Each file's identifiers
+are resolved in one batched checker call. The API is beta: expect to adjust when 7.1 ships.
+
+## Limits
+
+- Dynamic `import()`, `require()` and `import x = require()` are not edges yet.
+- A namespace import (`import * as x`) points at the module the specifier resolves to, a barrel included.
+- Class methods are not checked for cohesion against each other; each method gets the function rules.
