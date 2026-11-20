@@ -4,8 +4,9 @@
   "kinds": {
     "model": { "match": "src/model/**", "dependsOn": [] },
     "app": { "match": "src/app/**", "dependsOn": ["model"] },
-    "adapter": { "match": ["src/analysis/**", "src/git/**"], "dependsOn": ["app", "model"] },
+    "adapter": { "match": ["src/analysis/**", "src/config/**", "src/git/**"], "dependsOn": ["app", "model"] },
     "entry": { "match": "src/cli.ts", "dependsOn": ["adapter", "app", "model"] },
+    "api": { "match": "src/index.ts", "dependsOn": ["model"], "rules": { "no-cross-kind-reexport": { "allow": ["model"] } } },
     "integration": { "match": "integrations/**", "dependsOn": [] }
   }
 }

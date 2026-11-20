@@ -24,7 +24,7 @@ Or add it to one project as a dev dependency, and run it there with `pnpm exec f
 pnpm add -D link:~/src/snippets/fitness
 ```
 
-In the project to check, add a `fitness.config.json` next to its `tsconfig.json`, then:
+In the project to check, add a `fitness.config.json`, or a `fitness.config.ts` for [custom rules](#custom-rules), next to its `tsconfig.json`, then:
 
 ```sh
 fitness check                 # every finding in the working tree
@@ -35,7 +35,7 @@ fitness diff main...          # new or worse findings since the working tree's b
 
 | Flag | Effect |
 | --- | --- |
-| `--config <file>` | Config path. The project root is its directory. Default `fitness.config.json`. |
+| `--config <file>` | Config path. The project root is its directory. Default: the first of `fitness.config.ts`, `.mts`, `.js`, `.mjs` and `.json` in the current directory. |
 | `--reporter <name>` | Output format, default `text`. See [Reporters](#reporters). |
 | `--fail` | Exit 1 when there are findings (`check`) or new or worse ones (`diff`). Without it, both exit 0. |
 
@@ -127,14 +127,98 @@ fitness diff main...          # new or worse findings since the working tree's b
 
 See [`fitness.config.json`](./fitness.config.json) for the config this tool checks itself with.
 
+A `fitness.config.ts` (or `.mts`, `.js`, `.mjs`) takes the same shape as its default export. `defineConfig` types it:
+
+```ts
+import { defineConfig } from 'fitness';
+
+export default defineConfig({
+  exclude: ['**/*.test.ts'],
+  kinds: {
+    domain: { match: 'src/domain/**' },
+    app: { match: 'src/app/**', dependsOn: ['domain'] },
+  },
+});
+```
+
+Node strips the types itself, so there is no build step. `fitness` in an import always means the running fitness,
+installed in the project or not. The config and its rules load as ES modules: in a project whose `package.json` lacks
+`"type": "module"`, name them `.mts` (Node only warns when `type` is missing, but fails on `"type": "commonjs"`).
+
+## Custom rules
+
+A project adds its own rules in a `fitness.config.ts`, as plugins: objects with a `rules` list, imported, never named
+by path. Each plugin gets a namespace, and its rules are `namespace/id` in `rules` and in each kind's `rules`. They
+go through the same option checks as the built-in rules, and two rules with the same id are refused.
+
+Working title's application layer re-exports its ports so adapters can implement them, which lets the UI reach a port
+through `application` without breaking `dependency-direction`. A rule for that, in `fitness/rules.ts`:
+
+```ts
+import { matchesGlob } from 'node:path';
+import { ConfigError, type Plugin, type Rule } from 'fitness';
+
+const noPortsThroughApplication: Rule<{ ports: string[] }> = {
+  id: 'no-ports-through-application',
+  docs: 'https://example.com/no-ports-through-application.md', // optional, linked from its findings
+  defaults: { ports: ['src/application/ports/**'] },
+  parseOptions: ({ ports, ...rest }, at) => {
+    if (Object.keys(rest).length > 0) throw new ConfigError(`${at}: unknown key ${Object.keys(rest).join(', ')}`);
+    if (ports === undefined) return {};
+    if (!Array.isArray(ports) || !ports.every((glob) => typeof glob === 'string')) throw new ConfigError(`${at}.ports: expected globs`);
+    return { ports };
+  },
+  check: ({ module, options }) =>
+    module.imports
+      .filter((edge) => edge.via && options.ports.some((glob) => matchesGlob(edge.to, glob)))
+      .map((edge) => ({
+        rule: 'no-ports-through-application',
+        key: `no-ports-through-application:${module.file}->${edge.to}`,
+        file: module.file,
+        line: edge.line,
+        value: edge.names.length,
+        message: `${module.file} reaches the port ${edge.to} through ${edge.via}. Call a use case instead.`,
+      })),
+};
+
+export default { rules: [noPortsThroughApplication] } satisfies Plugin;
+```
+
+```ts
+// fitness.config.ts
+import { defineConfig } from 'fitness';
+import wt from './fitness/rules.ts';
+
+export default defineConfig({
+  plugins: { wt },
+  rules: { 'wt/no-ports-through-application': false },
+  kinds: {
+    domain: { match: 'src/domain/**' },
+    application: { match: 'src/application/**', dependsOn: ['domain'] },
+    ui: { match: 'src/ui/**', dependsOn: ['application', 'domain'], rules: { 'wt/no-ports-through-application': true } },
+  },
+});
+```
+
+- A rule reads the same facts as the built-in ones, through `RuleContext`: the module's imports, units and functions,
+  its kind and options, and `kindOf` for any other module. It never reads source.
+- Its findings get the namespaced `rule`, and keys prefixed with the namespace. They link to the rule's `docs` when
+  it has one, and to nothing otherwise.
+- `defaults` and `parseOptions` are optional: without them, the rule takes no options. `wholeNumberOptions` and
+  `ConfigError` are exported for writing `parseOptions`.
+- Relative imports need their `.ts` extension, and an import of types alone must be `import type`: Node strips types
+  without resolving them, so `import { type Rule }` would still load the module.
+- For types in the editor, the project needs `fitness` in its `node_modules`: `pnpm link fitness` after
+  `pnpm link --global`, or the dev dependency. Running needs neither.
+- `diff`'s cache key includes the config and every file it imports outside fitness, so editing a rule redoes the base.
+
 ## Rules
 
 Analysis extracts the facts once for the whole project: the import graph, with re-exports marked, each module's top-level units and the
 links between them, and each function's statements and complexity. Each rule is its own module in
 [`src/model/rules/`](./src/model/rules) that reads those facts for one module at a time, so it stays pure. A rule
 declares its id, its default options and how to validate them, and a `check` that returns findings. Rules are looked
-up in a registry, which is how a project's own rules will join the built-in ones; loading them from the config is not
-wired up yet.
+up in a registry, where a project's [own rules](#custom-rules) join the built-in ones.
 
 Every finding has a `rule`, a `key` that identifies it across commits, a `value` that `diff` compares, a `message`,
 `details` an agent can act on, and for built-in rules a `docs` link to the rule's page. The agent reporters list each
@@ -161,7 +245,7 @@ rule changes. With three dots, `<base>...<head>`, the base is where `<head>` (or
 `<base>`, as in git. A base commit where the project's tsconfig does not exist yet counts as having no findings.
 
 A ref is checked out into a temporary git worktree that links the project's `node_modules`, and its
-findings are cached under `.git/fitness-cache/` by commit, config and tool version, so repeated runs against the same
+findings are cached under `.git/fitness-cache/` by commit, config (with the custom rules it imports) and tool version, so repeated runs against the same
 base only analyse the head. Without a head, the head is the working tree.
 
 A finding is new when its key is absent at the base, and worse when its value rose. Findings in a renamed file or
