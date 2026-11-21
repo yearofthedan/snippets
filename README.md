@@ -30,9 +30,8 @@ transcripts on this machine. The transcripts and everything extracted from them 
   original note; [`compare.py`](./omp-notes/compare.py) lines runs up side by side
 - [`briefs/`](./omp-notes/briefs) — narrow reviewer briefs tested with the replay
 
-### fitness, now [warp](https://github.com/yearofthedan/warp)
-The architectural fitness CLI that lived in `fitness/` moved, with its history, to
-[yearofthedan/warp](https://github.com/yearofthedan/warp). Old links into `fitness/` resolve at commit `ac92a9d`.
+### [warp](https://github.com/yearofthedan/warp)
+A CLI that checks a TypeScript codebase against a declared model of its modules, in its own repo.
 
 ### [dev-skills](./plugins/dev-skills)
 A plugin of development rules and skills, published from this repo's marketplace
