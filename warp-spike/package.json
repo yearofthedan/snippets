@@ -1,0 +1,16 @@
+{
+  "name": "warp-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Throwaway spike of the Warp config model. Not the product.",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "probe": "tsc -p probe/tsconfig.json",
+    "run": "node src/main.ts"
+  },
+  "dependencies": { "typescript": "7.1.0-beta" },
+  "devDependencies": { "@types/node": "^22.18.0" },
+  "packageManager": "pnpm@10.28.0"
+}
