@@ -60,8 +60,8 @@ Seven terms, in the order they depend on each other:
 | Term | What it is | Example |
 | --- | --- | --- |
 | **Archetype** | A reusable unit type. It says how its instances are found, which parts they contain, what they expose to their parent, and what they require from above or provide below. | `component`, `layer` |
-| **Part** | A named piece of an archetype: a group of the unit's own files (`w.files`) or child folders of another archetype (`w.dir`). Every file belongs to one part. A part's `using` lists what its files may import. | `dom`, `test`, `components` |
-| **Unit** | An instance of an archetype in the code: the root, or a folder an `w.dir` part matched. Its id is its path. | `src/ui/project/graph` |
+| **Part** | A named piece of an archetype: a group of the unit's own files (`p.files`) or child folders of another archetype (`p.dir`). Every file belongs to one part. A part's `using` lists what its files may import. | `dom`, `test`, `components` |
+| **Unit** | An instance of an archetype in the code: the root, or a folder a `dir` part matched. Its id is its path. | `src/ui/project/graph` |
 | **Surface** | What a unit exposes to its parent: named groups of its parts. A file on no surface is private to its unit. | `render`, `testPage` |
 | **Edge** | One import between two files, as analysis resolved it. The rule contract calls a file a module. | `graph.ts` → `card.dom.ts` |
 | **Rule** | A check over files, units or the whole graph, against the model. It reports findings. | `dependency-direction` |
@@ -81,7 +81,7 @@ rules judge edges and units against the parts ──► findings
 queries read the same model ──► answers for agents
 ```
 
-An archetype is a type, and an `w.dir` part is a use of it, the way a class is used by a field. The same `component`
+An archetype is a type, and a `dir` part is a use of it, the way a class is used by a field. The same `component`
 archetype fills the `components` part of `ui` and, through `self`, the `subcomponent` part of each component. A
 part's options (`using`, `rules`) belong to that place in the tree, so one archetype can be used in two
 places with different neighbours.
@@ -92,41 +92,41 @@ A config is built with typed, chained builders that return plain data. Each step
 `requires` from above, what it `contains`, what it `exposes` to its parent, and what it `provides` to anything below.
 
 ```ts
-import { defineConfig, w } from 'warp';
+import { archetype, defineConfig, dir, files, pkg } from 'warp';
 
-const testRunner = w.archetype('test-runner')
-  .contains(() => w.parts()
-    .part('runner', w.files('**')))
+const testRunner = archetype('test-runner')
+  .contains((p) => p
+    .files('runner', '**'))
   .exposes((s) => ({ runner: s.runner }));   // proposed: the runner as one surface
 
-const component = w.archetype('component')
+const component = archetype('component')
   .identify({ marker: '{name}.dom.ts' })
-  .requires({ testRunner, application: w.dir(), strings: w.dir(), icons: w.dir() })
-  .contains(({ required, self }) => w.parts()
-    .part('subcomponent', w.dir('{name}', self))
-    .part('logic', w.files('*.ts', { using: [required.application, required.strings] }))
-    .part('dom', w.files('{name}.dom.ts', {
+  .requires({ testRunner, application: dir(), strings: dir(), icons: dir() })
+  .contains((p, { required, self }) => p
+    .dir('subcomponent', '{name}', self)
+    .files('logic', '*.ts', { using: [required.application, required.strings] })
+    .files('dom', '{name}.dom.ts', {
       using: (s) => [s.logic, s.subcomponent.render, required.application, required.icons, required.strings],
-    }))
-    .part('testPage', w.files('*.test-page.ts', { using: (s) => [s.dom, s.subcomponent.testPage] }))
-    .part('test', w.files('*.test.ts', { using: (s) => [s.logic, s.dom, s.testPage, required.testRunner] })))
+    })
+    .files('testPage', '*.test-page.ts', { using: (s) => [s.dom, s.subcomponent.testPage] })
+    .files('test', '*.test.ts', { using: (s) => [s.logic, s.dom, s.testPage, required.testRunner] }))
   .exposes((s) => ({ render: s.dom, testPage: s.testPage }));
 
-const ui = w.archetype('ui')
-  .contains(() => w.parts()
-    .part('strings', w.dir('strings'))
-    .part('icons', w.dir('icons'))
-    .part('components', w.dir('{name}', component)))
+const ui = archetype('ui')
+  .contains((p) => p
+    .dir('strings', 'strings')
+    .dir('icons', 'icons')
+    .dir('components', '{name}', component))
   .provides((s) => ({ strings: s.strings, icons: s.icons }))
   .exposes((s) => ({ render: s.components.render, testPage: s.components.testPage }));
 
-const app = w.archetype('app')
-  .contains(() => w.parts()
-    .part('domain', w.dir('src/domain'))
-    .part('application', w.dir('src/application', undefined, { using: (s) => [s.domain] }))
-    .part('ui', w.dir('src/ui', ui))
-    .part('main', w.files('src/main.ts', { using: (s) => [s.application, s.ui.render] }))
-    .part('testRunner', w.dir('src/test-helpers', testRunner, { using: (s) => [s.domain, s.application, s.ui.testPage] })))
+const app = archetype('app')
+  .contains((p) => p
+    .dir('domain', 'src/domain')
+    .dir('application', 'src/application', { using: (s) => [s.domain] })
+    .dir('ui', 'src/ui', ui)
+    .files('main', 'src/main.ts', { using: (s) => [s.application, s.ui.render] })
+    .dir('testRunner', 'src/test-helpers', testRunner, { using: (s) => [s.domain, s.application, s.ui.testPage] }))
   .provides((s) => ({ testRunner: s.testRunner, application: s.application }));
 
 export default defineConfig({ root: app, rules: { 'cognitive-complexity': { max: 15 } } });
@@ -142,9 +142,10 @@ application, which the root provides.
 names before it sees the return, so a misspelt `s.domian` compiles. Declaring parts one at a time lets each step be
 typed from the ones before it.
 
-**Parts.** `.part(name, w.files(pattern, options?))` is a group of the unit's own files. `.part(name, w.dir(path,
-archetype?, options?))` is a child unit per matching folder; without an archetype, the folder is a plain unit whose
-files are all exposed. A catch-all part is named for what it holds, such as `.part('src', w.files('**'))`.
+**Parts.** Inside `.contains((p, { required, self }) => p ...)`, the kind of part is the method and its name comes
+first. `p.files(name, pattern, options?)` is a group of the unit's own files. `p.dir(name, path, archetype?,
+options?)` is a child unit per matching folder; without an archetype (`p.dir('ports', 'src/ports')`), the folder is
+a plain unit whose files are all exposed. A catch-all part is named for what it holds, such as `.files('src', '**')`.
 
 **Order is dependency order.** A part sees only the parts declared above it, so `subcomponent` comes before `dom`, and
 layers before the ui that uses them. Two sibling parts can't use each other, so sibling parts can't form a cycle.
@@ -167,8 +168,8 @@ in `using`. Parts of one unit reach each other only through `using`. A parent re
 child exposes. A child never reaches its parent: an archetype is used in many places, so it can't name one. What a
 child needs from above, it requires.
 
-`using` on a `w.dir` part is exact: it applies to the files of the units that part matches, and not to the units
-nested inside them. `w.dir('src/application', undefined, { using: (s) => [s.domain] })` lets the application's files
+`using` on a `dir` part is exact: it applies to the files of the units that part matches, and not to the units
+nested inside them. `p.dir('application', 'src/application', { using: (s) => [s.domain] })` lets the application's files
 import the domain. Anything deeper that needs access requires it, and an ancestor provides it, so a component reaches
 the application because it requires it, not because `ui` was given it.
 
@@ -183,7 +184,7 @@ units may import, and a finding that said "card doesn't export cardLooks" would 
 exports it. "card doesn't expose card.ts" states the architecture.
 
 **Requires and provides.** `.requires()` is an archetype's external interface, typed by archetype: `{ testRunner,
-strings: w.dir() }`, where `w.dir()` and `w.files()` stand for a part with no archetype. `.provides()` offers a part
+strings: dir() }`, where `dir()` and `files()` stand for a part with no archetype. `.provides()` offers a part
 to anything below that requires it by that name. The nearest provider wins, and archetypes in between say nothing, so
 `ui` passes nothing down for the test runner the root provides. Config errors, before any file is read:
 
@@ -204,7 +205,7 @@ local name, and a local name that shadows a built-in id is refused:
 ```ts
 .rules((s, { required }) => ({
   'module-cohesion': { maxLines: 300 },                                        // built-in, by id
-  'dsl-on-the-contract': w.requires({ from: s.dsl, to: required.testRunner }),   // inline, by value
+  'dsl-on-the-contract': mustImport({ from: s.dsl, to: required.testRunner }),   // inline, by value
 }))
 ```
 
@@ -215,10 +216,10 @@ Finding keys and the diff cache hash that data.
 ### Types
 
 ```ts
-w.archetype(name: string)               // each step returns the builder; order: as listed
+archetype(name: string)                 // each step returns the builder; order: as listed
   .identify({ marker: string } | { match: (dir: string, chain: UnitView[]) => false | Record<string, string> })
-  .requires(Record<string, Archetype | Shape>)       // Shape: w.dir() or w.files(), a part with no archetype
-  .contains(({ required, self }) => Parts)            // w.parts().part(name, part)...
+  .requires(Record<string, Archetype | Shape>)       // Shape: dir() or files(), a part with no archetype
+  .contains((p, { required, self }) => p.files(...).dir(...))
   .exposes((s) => Record<string, Ref | Ref[]>)       // unset: everything is exposed
   .provides((s) => Record<string, Ref>)              // offered to anything below that requires the name
   .loose('allow' | 'warn' | 'deny')                  // default 'allow'; the root defaults to 'deny'
@@ -226,20 +227,20 @@ w.archetype(name: string)               // each step returns the builder; order:
   .description(string)                               // for agents choosing where code goes
 
 type Ref = Reference;   // s.part, s.part.surface, required.name, required.name.surface
-type Pkg = Package;     // w.pkg('vitest'), w.pkg('node:*'), w.pkg('@aws-sdk/*'), w.pkg('*')
+type Pkg = Package;     // pkg('vitest'), pkg('node:*'), pkg('@aws-sdk/*'), pkg('*')
 type Using = (Ref | Pkg)[] | ((s: PartsAbove) => (Ref | Pkg)[]);
 
-// w.files(pattern: string | string[], options?: FilesOptions)
-interface FilesOptions {
+// p.files(name: string, pattern: string | string[], options?: PartOptions)
+// p.dir(name: string, path: string | string[], options?: PartOptions)
+// p.dir(name: string, path: string | string[], archetype: Archetype, options?: PartOptions)
+interface PartOptions {
   using?: Using;                 // what its files may import, beyond their own part
   rules?: RuleSettings;
   description?: string;
 }
 
-// w.dir(path: string | string[], archetype?: Archetype, options?: FilesOptions)
-
 // 'off' is shorthand for { '*': false }: every rule off at that level, any listed beside '*' back on
-type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule from w.deny or w.requires
+type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule from forbid or mustImport
 
 interface WarpConfig {
   root: Archetype;
@@ -249,15 +250,15 @@ interface WarpConfig {
 }
 ```
 
-A `w.dir` path is relative to the parent unit, and its placeholders always capture afresh. Without a placeholder it
+A `p.dir` path is relative to the parent unit, and its placeholders always capture afresh. Without a placeholder it
 is one unit; with one (`'{name}'`), a unit per match; a list of paths is a unit per entry. The archetype's
-`identify`, if it has one, says which matching folders count: `w.dir('{name}', component)` with `marker:
+`identify`, if it has one, says which matching folders count: `p.dir('components', '{name}', component)` with `marker:
 '{name}.dom.ts'` takes only folders that hold their own `.dom.ts`.
 
 ## Finding units
 
 1. The root unit is the config's folder.
-2. For each unit, each `w.dir` part finds its units among the unit's own folders. A marker matches the shallowest
+2. For each unit, each `p.dir` part finds its units among the unit's own folders. A marker matches the shallowest
    folder. Deeper matches are found when Warp looks inside that unit, if its archetype has a part that finds them.
 3. A file belongs to its deepest unit, and within it to exactly one files part: the most specific that matches.
 4. A file no part matches is loose, and the unit's `loose` setting decides what that means.
@@ -283,8 +284,8 @@ code imports (CSS, JSON, SVG) belongs to a part like any other file. It can be t
 apply to it, but nothing is analysed inside it. Facts come from fact sources (today, the TS analysis), so another
 source, such as CSS's own `@import`s, can add edges later without touching rules.
 
-**Generated files.** Generated code is a part with its rules off: `.part('generated', w.dir('src/generated', undefined, {
-rules: 'off' }))`, or `rules: { '*': false, 'unit-cycle': true }` to keep a few. It stays a normal node: its importers are judged by
+**Generated files.** Generated code is a part with its rules off: `.dir('generated', 'src/generated', {
+rules: 'off' })`, or `rules: { '*': false, 'unit-cycle': true }` to keep a few. It stays a normal node: its importers are judged by
 their own `using`, and it counts in fan-in, cycles and queries. Only findings located in it are
 silenced.
 
@@ -313,12 +314,12 @@ don't reach each other unless the part lists itself, which declare-before-use do
 Type imports are imports: they obey `using` and surfaces like any other. A unit exposes types through a public file,
 a types file in an exposed part, or a barrel (`.exposes((s) => ({ api: s.index }))`).
 
-**Packages** go through `using` like anything else: `w.pkg('vitest')`, or a glob such as `w.pkg('node:*')` or
-`w.pkg('@aws-sdk/*')`. An external edge passes when A's part, or the dir part that matched A's unit, lists a matching
+**Packages** go through `using` like anything else: `pkg('vitest')`, or a glob such as `pkg('node:*')` or
+`pkg('@aws-sdk/*')`. An external edge passes when A's part, or the dir part that matched A's unit, lists a matching
 package, so a part with none may import none. The canonical case is a hexagon where only `adapters` lists packages,
 and a `test` part lists its runner while the code beside it lists nothing.
 
-**Inline rules.** `w.requires({ from, to })` reports a file in `from` that has no edge to `to`, and `w.deny({ from,
+**Inline rules.** `mustImport({ from, to })` reports a file in `from` that has no edge to `to`, and `forbid({ from,
 to })` forbids an edge that `using` would allow. Both take references.
 
 **Thresholds resolve nearest first.** For a rule's options: the file's files part, then its dir part, then each
@@ -443,7 +444,7 @@ or at the PR. Overlays change rules only, so the structure is the same in every 
 path, checked against the base config's types:
 
 ```ts
-export const edit = w.ruleset(config, {
+export const edit = ruleset(config, {
   rules: { 'cognitive-complexity': { max: 12 } },
   parts: {
     'ui.components': { rules: { 'module-cohesion': false } },
@@ -498,7 +499,7 @@ The model has to stay open to an act layer: codemods that add a unit, move a fil
 same archetypes to decide what to write and gating on `diff`. What keeps it possible:
 archetypes are plain data with names, `ModelView.verdict` answers for an edge that doesn't exist yet, and the model
 is built separately from rules. New fact sources add edges without touching rules, and a shorthand for
-`w.archetype` can come later.
+`archetype` can come later.
 
 ## Performance
 
@@ -523,7 +524,7 @@ is built separately from rules. New fact sources add edges without touching rule
 | File categories | no | yes | regex | no | files parts, each with its own `using` |
 | Type and value edges | no | yes | yes | no | recorded; cycle rules can ignore type-only edges |
 | Re-export chains | no | no | no | no | resolved to the declarer |
-| Required imports | no | no | yes | no | `w.requires` |
+| Required imports | no | no | yes | no | `mustImport` |
 | Cycles | no | no | files | projects | files and units |
 | External packages | no | yes | yes | per tag | per part |
 | Unit measures | no | no | no | no | yes |
@@ -531,7 +532,7 @@ is built separately from rules. New fact sources add edges without touching rule
 
 Borrowed: from boundaries, file categories apart from units, and parent, child and sibling relationships; from
 Sheriff, the placeholder syntax and its barrel and internal-folder surfaces, which here are just files parts
-(`w.files('index.ts')`); from Vue's provide and inject, the nearest provider answering a requirement. `index.ts` is
+(`p.files('index', 'index.ts')`); from Vue's provide and inject, the nearest provider answering a requirement. `index.ts` is
 one possible marker or surface among others.
 
 [Sheriff]: https://github.com/softarc-consulting/sheriff
@@ -544,7 +545,7 @@ one possible marker or surface among others.
 Working title's config ran in the spike ([PR 34](https://github.com/yearofthedan/snippets/pull/34), `warp-spike/`)
 against `main` at `9c69b9a`. The other configs are written against each repo as of 2026-11-21 and haven't run; the
 NestJS app and the shared component library are on paper. A preset is an archetype like any other, so a project
-either uses one in a `w.dir` part or writes the shape out, as the configs below do.
+either uses one in a `dir` part or writes the shape out, as the configs below do.
 
 ### Working title
 
@@ -558,83 +559,83 @@ This is the spike's config, 84 lines, which types cleanly and runs. It keeps the
 surfaces apart; making the runner one surface is proposed (see [Open](#open)).
 
 ```ts
-import { defineConfig, w } from 'warp';
+import { archetype, defineConfig, dir, files, pkg } from 'warp';
 
-const testRunner = w.archetype('test-runner')
-  .contains(() => w.parts()
-    .part('contract', w.files(['driver.ts', 'steps.ts', 'seed.ts', 'narrowing.ts', 'scenario-file.ts', 'ids.ts']))
-    .part('runner', w.files('**', { using: (s) => [s.contract] })))
+const testRunner = archetype('test-runner')
+  .contains((p) => p
+    .files('contract', ['driver.ts', 'steps.ts', 'seed.ts', 'narrowing.ts', 'scenario-file.ts', 'ids.ts'])
+    .files('runner', '**', { using: (s) => [s.contract] }))
   .exposes((s) => ({ contract: s.contract, runner: s.runner }));
 
 // a folder of code whose tests need the runner: domain, application, adapters, lint
-const layer = w.archetype('layer')
-  .requires({ testRunner, methods: w.dir() })
-  .contains(({ required }) => w.parts()
-    .part('src', w.files('**'))
-    .part('test', w.files('**/*.test.ts', {
-      using: (s) => [s.src, required.testRunner.runner, required.testRunner.contract, required.methods, w.pkg('vite-plus/*')],
-    })))
+const layer = archetype('layer')
+  .requires({ testRunner, methods: dir() })
+  .contains((p, { required }) => p
+    .files('src', '**')
+    .files('test', '**/*.test.ts', {
+      using: (s) => [s.src, required.testRunner.runner, required.testRunner.contract, required.methods, pkg('vite-plus/*')],
+    }))
   .exposes((s) => ({ code: s.src }));
 
-const component = w.archetype('component')
+const component = archetype('component')
   .identify({ marker: '{name}.dom.ts' })
-  .requires({ testRunner, application: layer, ports: w.dir(), strings: w.dir(), icons: w.dir(), transition: w.files() })
-  .contains(({ required, self }) => w.parts()
-    .part('subcomponent', w.dir('{name}', self))
-    .part('logic', w.files('*.ts', { using: [required.strings, required.application] }))
-    .part('dom', w.files('{name}.dom.ts', {
+  .requires({ testRunner, application: layer, ports: dir(), strings: dir(), icons: dir(), transition: files() })
+  .contains((p, { required, self }) => p
+    .dir('subcomponent', '{name}', self)
+    .files('logic', '*.ts', { using: [required.strings, required.application] })
+    .files('dom', '{name}.dom.ts', {
       using: (s) => [s.logic, s.subcomponent.render, required.icons, required.strings, required.transition, required.application, required.ports],
-    }))
-    .part('dsl', w.files('*.dsl.ts', { using: (s) => [s.subcomponent.dsl, required.testRunner.contract] }))
-    .part('testPage', w.files('*.test-page.ts', { using: (s) => [s.subcomponent.testPage, w.pkg('vite-plus/*')] }))
-    .part('harness', w.files('*.harness.ts', {
-      using: (s) => [s.dom, s.logic, s.dsl, s.testPage, required.testRunner.runner, required.testRunner.contract, required.application, required.ports, w.pkg('vite-plus/*')],
-    }))
-    .part('test', w.files('*.test.ts', {
+    })
+    .files('dsl', '*.dsl.ts', { using: (s) => [s.subcomponent.dsl, required.testRunner.contract] })
+    .files('testPage', '*.test-page.ts', { using: (s) => [s.subcomponent.testPage, pkg('vite-plus/*')] })
+    .files('harness', '*.harness.ts', {
+      using: (s) => [s.dom, s.logic, s.dsl, s.testPage, required.testRunner.runner, required.testRunner.contract, required.application, required.ports, pkg('vite-plus/*')],
+    })
+    .files('test', '*.test.ts', {
       using: (s) => [
         s.logic, s.dom, s.harness, s.testPage, s.dsl, s.subcomponent.testPage,
         required.testRunner.runner, required.testRunner.contract, required.application,
-        w.pkg('vite-plus/*'), w.pkg('@playwright/*'),
+        pkg('vite-plus/*'), pkg('@playwright/*'),
       ],
-    })))
+    }))
   .exposes((s) => ({ render: s.dom, testPage: s.testPage, dsl: s.dsl }));
 
-const ui = w.archetype('ui')
-  .contains(() => w.parts()
-    .part('components', w.dir('{name}', component))
-    .part('strings', w.dir('strings', undefined, { description: "The app's words" }))
-    .part('icons', w.dir('icons'))
-    .part('transition', w.files('transition.ts'))
-    .part('test', w.files('*.test.ts', { using: (s) => [s.transition, w.pkg('vite-plus/*')] })))
+const ui = archetype('ui')
+  .contains((p) => p
+    .dir('components', '{name}', component)
+    .dir('strings', 'strings', { description: "The app's words" })
+    .dir('icons', 'icons')
+    .files('transition', 'transition.ts')
+    .files('test', '*.test.ts', { using: (s) => [s.transition, pkg('vite-plus/*')] }))
   .provides((s) => ({ strings: s.strings, icons: s.icons, transition: s.transition }))
   .exposes((s) => ({ render: s.components.render, testPage: s.components.testPage, dsl: s.components.dsl, strings: s.strings }));
 
-const journeys = w.archetype('journeys')
+const journeys = archetype('journeys')
   .requires({ testRunner, ui })
-  .contains(({ required }) => w.parts()
-    .part('dsl', w.files('*.dsl.ts', { using: [required.testRunner.contract, required.ui.dsl] }))
-    .part('rest', w.files('**', { using: (s) => [s.dsl, required.testRunner.runner, required.testRunner.contract, required.ui.dsl] })));
+  .contains((p, { required }) => p
+    .files('dsl', '*.dsl.ts', { using: [required.testRunner.contract, required.ui.dsl] })
+    .files('rest', '**', { using: (s) => [s.dsl, required.testRunner.runner, required.testRunner.contract, required.ui.dsl] }));
 
-const workingTitle = w.archetype('working-title')
+const workingTitle = archetype('working-title')
   .loose('deny')
-  .contains(() => w.parts()
-    .part('domain', w.dir('src/domain', layer))
-    .part('ports', w.dir('src/ports', undefined, { using: (s) => [s.domain] }))
-    .part('methods', w.dir('src/methods', undefined, { using: (s) => [s.domain] }))
-    .part('application', w.dir('src/application', layer, { using: (s) => [s.domain, s.ports] }))
-    .part('adapters', w.dir('src/adapters', layer, { using: (s) => [s.domain, s.ports, w.pkg('*')] }))
-    .part('ui', w.dir('src/ui', ui, { using: (s) => [s.application] }))
-    .part('styles', w.files('src/*.css'))
-    .part('shell', w.files('src/shell.ts', { using: (s) => [s.application, s.ui.strings] }))
-    .part('app', w.files(['src/main.ts', 'src/app.ts'], {
-      using: (s) => [s.application, s.adapters, s.ports, s.methods, s.ui.render, s.ui.strings, s.shell, s.styles, w.pkg('virtual:*')],
-    }))
-    .part('testRunner', w.dir('src/test-helpers', testRunner, {
-      using: (s) => [s.domain, s.application, s.adapters, s.methods, s.app, s.shell, s.ui.render, s.ui.testPage, s.ports, w.pkg('*')],
-    }))
-    .part('e2e', w.dir('e2e', journeys, { using: (s) => [s.adapters, s.ui.testPage, w.pkg('*')] }))
-    .part('lint', w.dir('lint', layer, { using: [w.pkg('*')] }))
-    .part('tooling', w.files(['*.ts', 'scripts/**/*.ts'], { using: (s) => [s.lint, w.pkg('*')] })))
+  .contains((p) => p
+    .dir('domain', 'src/domain', layer)
+    .dir('ports', 'src/ports', { using: (s) => [s.domain] })
+    .dir('methods', 'src/methods', { using: (s) => [s.domain] })
+    .dir('application', 'src/application', layer, { using: (s) => [s.domain, s.ports] })
+    .dir('adapters', 'src/adapters', layer, { using: (s) => [s.domain, s.ports, pkg('*')] })
+    .dir('ui', 'src/ui', ui, { using: (s) => [s.application] })
+    .files('styles', 'src/*.css')
+    .files('shell', 'src/shell.ts', { using: (s) => [s.application, s.ui.strings] })
+    .files('app', ['src/main.ts', 'src/app.ts'], {
+      using: (s) => [s.application, s.adapters, s.ports, s.methods, s.ui.render, s.ui.strings, s.shell, s.styles, pkg('virtual:*')],
+    })
+    .dir('testRunner', 'src/test-helpers', testRunner, {
+      using: (s) => [s.domain, s.application, s.adapters, s.methods, s.app, s.shell, s.ui.render, s.ui.testPage, s.ports, pkg('*')],
+    })
+    .dir('e2e', 'e2e', journeys, { using: (s) => [s.adapters, s.ui.testPage, pkg('*')] })
+    .dir('lint', 'lint', layer, { using: [pkg('*')] })
+    .files('tooling', ['*.ts', 'scripts/**/*.ts'], { using: (s) => [s.lint, pkg('*')] }))
   .provides((s) => ({ testRunner: s.testRunner, application: s.application, ports: s.ports, methods: s.methods, ui: s.ui }));
 
 export default defineConfig({ root: workingTitle });
@@ -668,6 +669,10 @@ gives 17 findings on 481 edges. 13 were known, and 4 are new:
 | `project` → `src/shell.ts` (dom, harness, component test) | 3 | known |
 | `project`'s dsl, harness and component test → sibling `your-projects` | 3 | new |
 | `project.component.test.ts` → grandchild `card.test-page.ts` | 1 | new |
+
+The kind-as-method shape shown here (`p.files(name, ...)`, named imports) was checked against the spike's
+builders afterwards: the same type errors, with "Did you mean", a `p.dir(name, path, options)` overload for plain
+folders that keeps `s` typed, and the same 17 findings.
 
 The new ones are smells of the same kind as the known ones: `project`'s tests drive `your-projects`, and reach past
 `graph` to `card`.
@@ -718,42 +723,42 @@ Weaver has its own layers: ports at the bottom, an engine tier, operations, a da
 slices. Layers expose all of their code, so only `using` limits reach.
 
 ```ts
-const layer = w.archetype('layer')
-  .requires({ testHelpers: w.dir() })
-  .contains(({ required }) => w.parts()
-    .part('src', w.files('**'))
-    .part('test', w.files('**/*.test.ts', { using: (s) => [s.src, required.testHelpers, w.pkg('vitest')] })))
+const layer = archetype('layer')
+  .requires({ testHelpers: dir() })
+  .contains((p, { required }) => p
+    .files('src', '**')
+    .files('test', '**/*.test.ts', { using: (s) => [s.src, required.testHelpers, pkg('vitest')] }))
   .exposes((s) => ({ code: s.src }));
 
-const plugin = w.archetype('plugin')
+const plugin = archetype('plugin')
   .description('One framework: detection, engine, helpers')
-  .requires({ testHelpers: w.dir(), domain: layer, ports: layer, utils: layer, engines: layer })
-  .contains(({ required }) => w.parts()
-    .part('src', w.files('**', { using: [required.domain, required.ports, required.utils, required.engines, w.pkg('*')] }))
-    .part('test', w.files('**/*.test.ts', { using: (s) => [s.src, required.testHelpers, w.pkg('vitest')] })))
+  .requires({ testHelpers: dir(), domain: layer, ports: layer, utils: layer, engines: layer })
+  .contains((p, { required }) => p
+    .files('src', '**', { using: [required.domain, required.ports, required.utils, required.engines, pkg('*')] })
+    .files('test', '**/*.test.ts', { using: (s) => [s.src, required.testHelpers, pkg('vitest')] }))
   .exposes((s) => ({ code: s.src }));
 
-const plugins = w.archetype('plugins')
-  .contains(() => w.parts().part('plugin', w.dir('{name}', plugin)));
+const plugins = archetype('plugins')
+  .contains((p) => p.dir('plugin', '{name}', plugin));
 
-const weaver = w.archetype('weaver')
+const weaver = archetype('weaver')
   .loose('deny')
-  .contains(() => w.parts()
-    .part('ports', w.dir('src/ports', layer, { using: [w.pkg('node:*')] }))
-    .part('domain', w.dir('src/domain', layer, { using: (s) => [s.ports, w.pkg('node:path')] }))
-    .part('utils', w.dir('src/utils', layer, { using: (s) => [s.domain, s.ports, w.pkg('*')] }))
-    .part('engines', w.dir(['src/ts-engine', 'src/operations'], layer, {
+  .contains((p) => p
+    .dir('ports', 'src/ports', layer, { using: [pkg('node:*')] })
+    .dir('domain', 'src/domain', layer, { using: (s) => [s.ports, pkg('node:path')] })
+    .dir('utils', 'src/utils', layer, { using: (s) => [s.domain, s.ports, pkg('*')] })
+    .dir('engines', ['src/ts-engine', 'src/operations'], layer, {
       rules: { 'unit-cycle': false },   // its two units use each other; see below and Open
-      using: (s) => [s.domain, s.ports, s.utils, w.pkg('*')],
-    }))
-    .part('plugins', w.dir('src/plugins', plugins))
-    .part('daemon', w.dir(['src/daemon', 'src/adapters'], layer, {
+      using: (s) => [s.domain, s.ports, s.utils, pkg('*')],
+    })
+    .dir('plugins', 'src/plugins', plugins)
+    .dir('daemon', ['src/daemon', 'src/adapters'], layer, {
       rules: { 'unit-cycle': false },
-      using: (s) => [s.domain, s.ports, s.utils, s.engines, s.plugins, w.pkg('*')],
+      using: (s) => [s.domain, s.ports, s.utils, s.engines, s.plugins, pkg('*')],
+    })
+    .dir('testHelpers', 'src/__testHelpers__', {
+      using: (s) => [s.domain, s.ports, s.utils, s.engines, s.plugins, pkg('*')],
     }))
-    .part('testHelpers', w.dir('src/__testHelpers__', undefined, {
-      using: (s) => [s.domain, s.ports, s.utils, s.engines, s.plugins, w.pkg('*')],
-    })))
   .provides((s) => ({
     testHelpers: s.testHelpers, domain: s.domain, ports: s.ports, utils: s.utils, engines: s.engines,
   }));
@@ -762,7 +767,7 @@ export default defineConfig({ root: weaver, tsconfig: ['tsconfig.json', 'tsconfi
 ```
 
 What fits: the tiers, and plugins as slices: the `plugin` part doesn't list itself, so a Svelte plugin couldn't
-import the Vue one. `w.pkg('node:path')` in domain's `using` replaces `domain-purity.test.ts`.
+import the Vue one. `pkg('node:path')` in domain's `using` replaces `domain-purity.test.ts`.
 
 What doesn't, mostly design smells the model brings out rather than gaps in it:
 
@@ -786,42 +791,42 @@ What doesn't, mostly design smells the model brings out rather than gaps in it:
 Warp's own package, still at `fitness/` in snippets.
 
 ```ts
-const rule = w.archetype('rule')
-  .requires({ core: w.files() })
-  .contains(({ required }) => w.parts()
-    .part('src', w.files('*.ts', { using: [required.core] }))
-    .part('test', w.files('*.test.ts', { using: (s) => [s.src, w.pkg('node:*')] })))
+const rule = archetype('rule')
+  .requires({ core: files() })
+  .contains((p, { required }) => p
+    .files('src', '*.ts', { using: [required.core] })
+    .files('test', '*.test.ts', { using: (s) => [s.src, pkg('node:*')] }))
   .exposes((s) => ({ rule: s.src }));
 
-const rules = w.archetype('rules')
-  .contains(() => w.parts()
-    .part('shared', w.files('shared.ts'))
-    .part('rule', w.dir('{id}', rule, { using: (s) => [s.shared] }))
-    .part('index', w.files('index.ts', { using: (s) => [s.rule] })));
+const rules = archetype('rules')
+  .contains((p) => p
+    .files('shared', 'shared.ts')
+    .dir('rule', '{id}', rule, { using: (s) => [s.shared] })
+    .files('index', 'index.ts', { using: (s) => [s.rule] }));
 
-const model = w.archetype('model')
-  .contains(() => w.parts()
-    .part('core', w.files('*.ts', { using: [w.pkg('node:path')] }))
-    .part('rules', w.dir('rules', rules, { using: (s) => [s.core] })))
+const model = archetype('model')
+  .contains((p) => p
+    .files('core', '*.ts', { using: [pkg('node:path')] })
+    .dir('rules', 'rules', rules, { using: (s) => [s.core] }))
   .provides((s) => ({ core: s.core }));
 
-const warp = w.archetype('warp')
+const warp = archetype('warp')
   .loose('deny')
-  .contains(() => w.parts()
-    .part('model', w.dir('src/model', model))
-    .part('app', w.dir('src/app', undefined, { using: (s) => [s.model, w.pkg('node:*')] }))
-    .part('reporters', w.dir('src/reporters', undefined, { using: (s) => [s.model] }))
-    .part('adapters', w.dir(['src/analysis', 'src/config', 'src/git'], undefined, { using: (s) => [s.app, s.model, w.pkg('*')] }))
-    .part('entry', w.files(['src/cli.ts', 'src/builtins.ts'], { using: (s) => [s.adapters, s.reporters, s.app, s.model] }))
-    .part('api', w.files('src/index.ts', {
+  .contains((p) => p
+    .dir('model', 'src/model', model)
+    .dir('app', 'src/app', { using: (s) => [s.model, pkg('node:*')] })
+    .dir('reporters', 'src/reporters', { using: (s) => [s.model] })
+    .dir('adapters', ['src/analysis', 'src/config', 'src/git'], { using: (s) => [s.app, s.model, pkg('*')] })
+    .files('entry', ['src/cli.ts', 'src/builtins.ts'], { using: (s) => [s.adapters, s.reporters, s.app, s.model] })
+    .files('api', 'src/index.ts', {
       using: (s) => [s.model],
       rules: { 'no-cross-unit-reexport': { allow: ['model'] } },
-    }))
-    .part('integrations', w.dir('integrations'))
-    .part('tests', w.files('test/*.ts', {
-      using: (s) => [s.model, s.app, s.reporters, s.adapters, s.entry, s.api, s.integrations, w.pkg('node:*')],
+    })
+    .dir('integrations', 'integrations')
+    .files('tests', 'test/*.ts', {
+      using: (s) => [s.model, s.app, s.reporters, s.adapters, s.entry, s.api, s.integrations, pkg('node:*')],
       description: 'Tests against the public units',
-    })));
+    }));
 
 export default defineConfig({ root: warp });
 ```
@@ -845,35 +850,35 @@ A Nest app is a set of feature modules, each a folder with `{name}.module.ts`, h
 repositories and DTOs, and importing other modules through what they export.
 
 ```ts
-const nest = w.pkg('@nestjs/*');
+const nest = pkg('@nestjs/*');
 
-const nestModule = w.archetype('nest-module')
+const nestModule = archetype('nest-module')
   .identify({ marker: '{name}.module.ts' })
-  .requires({ common: w.dir() })
-  .contains(({ required, self }) => w.parts()
-    .part('submodule', w.dir('{name}', self))
-    .part('entity', w.files('*.entity.ts'))
-    .part('dto', w.dir('dto'))
-    .part('repository', w.files('*.repository.ts', { using: (s) => [s.entity, w.pkg('typeorm')] }))
-    .part('service', w.files('*.service.ts', {
+  .requires({ common: dir() })
+  .contains((p, { required, self }) => p
+    .dir('submodule', '{name}', self)
+    .files('entity', '*.entity.ts')
+    .dir('dto', 'dto')
+    .files('repository', '*.repository.ts', { using: (s) => [s.entity, pkg('typeorm')] })
+    .files('service', '*.service.ts', {
       using: (s) => [s.repository, s.entity, s.dto, s.submodule.api, required.common, nest],
-    }))
-    .part('controller', w.files('*.controller.ts', { using: (s) => [s.service, s.dto, required.common, nest] }))
-    .part('module', w.files('{name}.module.ts', {
+    })
+    .files('controller', '*.controller.ts', { using: (s) => [s.service, s.dto, required.common, nest] })
+    .files('module', '{name}.module.ts', {
       using: (s) => [s.controller, s.service, s.repository, s.submodule.api, nest],
+    })
+    .files('test', '**/*.spec.ts', {
+      using: (s) => [s.module, s.controller, s.service, s.repository, s.entity, s.dto, pkg('@nestjs/testing'), pkg('jest')],
     }))
-    .part('test', w.files('**/*.spec.ts', {
-      using: (s) => [s.module, s.controller, s.service, s.repository, s.entity, s.dto, w.pkg('@nestjs/testing'), w.pkg('jest')],
-    })))
   .exposes((s) => ({ api: [s.module, s.service, s.dto] }));
 
-const nestApp = w.archetype('nest-app')
+const nestApp = archetype('nest-app')
   .loose('deny')
-  .contains(() => w.parts()
-    .part('common', w.dir('src/common', undefined, { using: [nest] }))
-    .part('modules', w.dir('src/{name}', nestModule, { using: (s) => [s.modules.api] }))
-    .part('app', w.files(['src/main.ts', 'src/app.*.ts'], { using: (s) => [s.common, s.modules.api, nest] }))
-    .part('e2e', w.dir('test', undefined, { using: (s) => [s.app, w.pkg('supertest'), w.pkg('jest')] })))
+  .contains((p) => p
+    .dir('common', 'src/common', { using: [nest] })
+    .dir('modules', 'src/{name}', nestModule, { using: (s) => [s.modules.api] })
+    .files('app', ['src/main.ts', 'src/app.*.ts'], { using: (s) => [s.common, s.modules.api, nest] })
+    .dir('e2e', 'test', { using: (s) => [s.app, pkg('supertest'), pkg('jest')] }))
   .provides((s) => ({ common: s.common }));
 ```
 
@@ -894,15 +899,15 @@ A library of components above the app's own, which app components import and whi
 It reuses working title's `component` archetype.
 
 ```ts
-const designSystem = w.archetype('design-system')
-  .contains(() => w.parts()
-    .part('icons', w.dir('icons'))
-    .part('tokens', w.files('*.css'))
-    .part('components', w.dir('{name}', component)))
+const designSystem = archetype('design-system')
+  .contains((p) => p
+    .dir('icons', 'icons')
+    .files('tokens', '*.css')
+    .dir('components', '{name}', component))
   .provides((s) => ({ icons: s.icons, tokens: s.tokens }))
   .exposes((s) => ({ render: s.components.render, testPage: s.components.testPage }));
 
-// in the app: .part('designSystem', w.dir('src/design-system', designSystem)), declared before ui,
+// in the app: .dir('designSystem', 'src/design-system', designSystem), declared before ui,
 // .provides({ designSystem }), and the app's component requires it
 ```
 
@@ -944,8 +949,8 @@ Folders holding several components side by side stay out of scope: they would ne
 1. Model: archetype types, finding units on the file system, `unclassified`, specificity and its errors,
    `warp model`, `migrate-config`. Existing rules run on `unit` through a shim.
 2. Rule contract: scopes, `ModelView`, phase and `--phase`. Port the built-in rules.
-3. Structure: parts, surfaces, `using`, requires and provides with their checks, inline rules (`w.deny`,
-   `w.requires`), `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise.
+3. Structure: parts, surfaces, `using`, requires and provides with their checks, inline rules (`forbid`,
+   `mustImport`), `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise.
 4. Queries: `where` and `may`. Try them from omp on working title before going further, so a real consumer shapes
    what follows.
 5. Facts: external edges and assets, then `unit-externals`.
@@ -975,9 +980,9 @@ Folders holding several components side by side stay out of scope: they would ne
    inside it. Parts of one unit meet only through `using`, a parent reaches a child only through what it exposes, and requirements are typed by archetype and checked against providers before any file
    is read.
 
-10. **The config is a chain.** `w.archetype(name).requires().contains().exposes().provides()`, with parts declared
-    one at a time in `.contains()`. The single-callback shape can't be typed, and the chain forces the order the
-    types need.
+10. **The config is a chain.** `archetype(name).requires().contains((p) => p.files(...).dir(...)).exposes().provides()`,
+    with parts declared one at a time and the kind of part as the method, name first. Builders are named imports
+    from `warp`. The single-callback shape can't be typed, and the chain forces the order the types need.
 11. **Declare before use.** A part sees only the parts above it, so the order follows dependencies and sibling parts
     can't form a cycle.
 12. **Types for convenience, the load-time check for correctness.** Self surfaces (`s.subcomponent.render`) accept
@@ -1005,8 +1010,6 @@ Folders holding several components side by side stay out of scope: they would ne
   the runner". A shorthand such as `s.$unit` would cut most of them.
 - **Self surfaces are checked late.** `s.subcomponent.<anything>` compiles and offers no completions; a typo shows
   up when the config loads, not in the editor.
-- **`w.dir(path, undefined, options)`** for a plain folder with options reads badly. `.part()` needs one signature
-  for inference to work, so an overload isn't a free fix.
 - **Callbacks mean the config is data only after it runs.** `--print-config` shows the result, but the source can't
   be read statically, and `match` functions and plugin rules stay executable.
 
