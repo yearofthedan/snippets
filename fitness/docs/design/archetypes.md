@@ -240,7 +240,7 @@ interface PartOptions {
 }
 
 // 'off' is shorthand for { '*': false }: every rule off at that level, any listed beside '*' back on
-type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule from forbid or mustImport
+type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule: mustImport, for now
 
 interface WarpConfig {
   root: Archetype;
@@ -319,8 +319,9 @@ a types file in an exposed part, or a barrel (`.exposes((s) => ({ api: s.index }
 package, so a part with none may import none. The canonical case is a hexagon where only `adapters` lists packages,
 and a `test` part lists its runner while the code beside it lists nothing.
 
-**Inline rules.** `mustImport({ from, to })` reports a file in `from` that has no edge to `to`, and `forbid({ from,
-to })` forbids an edge that `using` would allow. Both take references.
+**Inline rules.** `using` says what a file may import; an inline rule says what it must. `mustImport({ from, to })`
+reports a file in `from` that has no edge to `to`, and takes references. Inline rules are named `mustX`; forbidding
+an edge needs no rule, since leaving it out of `using` does that.
 
 **Thresholds resolve nearest first.** For a rule's options: the file's files part, then its dir part, then each
 archetype from the innermost out, then the global `rules`, then the rule's defaults. Options resolve for the file a
@@ -559,7 +560,7 @@ This is the spike's config, 84 lines, which types cleanly and runs. It keeps the
 surfaces apart; making the runner one surface is proposed (see [Open](#open)).
 
 ```ts
-import { archetype, defineConfig, dir, files, pkg } from 'warp';
+import { archetype, defineConfig, dir, files, mustImport, pkg } from 'warp';
 
 const testRunner = archetype('test-runner')
   .contains((p) => p
@@ -598,7 +599,10 @@ const component = archetype('component')
         pkg('vite-plus/*'), pkg('@playwright/*'),
       ],
     }))
-  .exposes((s) => ({ render: s.dom, testPage: s.testPage, dsl: s.dsl }));
+  .exposes((s) => ({ render: s.dom, testPage: s.testPage, dsl: s.dsl }))
+  .rules((s, { required }) => ({
+    'dsl-on-the-driver-contract': mustImport({ from: s.dsl, to: required.testRunner.contract }),
+  }));
 
 const ui = archetype('ui')
   .contains((p) => p
@@ -614,7 +618,10 @@ const journeys = archetype('journeys')
   .requires({ testRunner, ui })
   .contains((p, { required }) => p
     .files('dsl', '*.dsl.ts', { using: [required.testRunner.contract, required.ui.dsl] })
-    .files('rest', '**', { using: (s) => [s.dsl, required.testRunner.runner, required.testRunner.contract, required.ui.dsl] }));
+    .files('rest', '**', { using: (s) => [s.dsl, required.testRunner.runner, required.testRunner.contract, required.ui.dsl] }))
+  .rules((s, { required }) => ({
+    'dsl-on-the-driver-contract': mustImport({ from: s.dsl, to: required.testRunner.contract }),
+  }));
 
 const workingTitle = archetype('working-title')
   .loose('deny')
@@ -680,7 +687,8 @@ The new ones are smells of the same kind as the known ones: `project`'s tests dr
 What fits:
 
 - Layer direction, a component reached only through its render file, logic kept off the dom, drivers kept out of
-  languages, and cycles all map directly. The depcruise rules become `using` lists, with no inline rule. `ui/icons`
+  languages, and cycles all map directly. The depcruise rules become `using` lists, and the one that says what a
+  file must import, every language on the driver contract, is a `mustImport` (the spike left it out). `ui/icons`
   has no `icons.dom.ts`, so the marker leaves it out of `components`.
 - The nesting is the reach: a component reaches only its direct children, and `icons`, `strings` and `transition`
   are what `ui` provides to every component at any depth. The root provides the application and ports the same way.
@@ -949,8 +957,8 @@ Folders holding several components side by side stay out of scope: they would ne
 1. Model: archetype types, finding units on the file system, `unclassified`, specificity and its errors,
    `warp model`, `migrate-config`. Existing rules run on `unit` through a shim.
 2. Rule contract: scopes, `ModelView`, phase and `--phase`. Port the built-in rules.
-3. Structure: parts, surfaces, `using`, requires and provides with their checks, inline rules (`forbid`,
-   `mustImport`), `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise.
+3. Structure: parts, surfaces, `using`, requires and provides with their checks, inline rules
+   (`mustImport`), `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise.
 4. Queries: `where` and `may`. Try them from omp on working title before going further, so a real consumer shapes
    what follows.
 5. Facts: external edges and assets, then `unit-externals`.
@@ -988,6 +996,8 @@ Folders holding several components side by side stay out of scope: they would ne
 12. **Types for convenience, the load-time check for correctness.** Self surfaces (`s.subcomponent.render`) accept
     any name in the types and are checked when the config loads; everything else is strictly typed. Surface names
     aren't declared up front.
+13. **Inline rules say what a file must do,** named `mustX`. `mustImport` is the only one so far; forbidding an edge
+    is leaving it out of `using`.
 
 ## Open
 
