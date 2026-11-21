@@ -115,7 +115,7 @@ What the 48 extra findings in the doc's config were, i.e. what it took to fit re
 1. **Plumbing for shared things.** `application` and `ports` for components, `methods` for layer tests, `ui` for
    journeys: each is `provides` at the root + `requires` in the archetype + an entry per part. The tuned config
    added 4 provides, 4 requires and about 20 `using` entries for that.
-2. **Long `using` lists on test parts.** `component.test` has 12 entries, `harness` 9. Most are "everything in my
+2. **Long `using` lists on test parts.** `component.test` has 11 entries, `harness` 9. Most are "everything in my
    unit plus the runner". A `s.$unit`-style shorthand would cut most of them.
 3. **Two places per part** (pattern in `contains`, permissions in `using`) and **key order** (above). Both come from
    the inference fix, not the model.
