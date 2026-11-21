@@ -172,6 +172,30 @@ nested `.contains()` variant puts `required` and `self` in one scope, so most pa
 closer to the doc, with one extra level of nesting. If the flat form is kept, passing `required` through `s`
 (`s.$required.strings`) would remove the second argument.
 
+### Self references without `.surfaces()` (round three)
+
+`probe/lazy-self.ts`. Both options build the same data as the flat chain and give the same 17 findings.
+
+**Option 1, lazy.** `s.subcomponent('render')`. A call argument keeps its literal type, which a property access
+can't, so each part records the self-surface names it uses. `.exposes()` at the end must define all of them. There
+are no names up front and the order is free. Costs:
+- No completions inside the call.
+- A typo errors at `.exposes`, not on the line with the typo:
+  `Property 'rendr' is missing in type '{ render: Ref; }' but required in type '{ rendr: Ref[] | Ref; }'`. With
+  option 2's overload present, TypeScript also prefixes "No overload matches this call".
+- An archetype with no `.exposes()` is never checked at the type level. The model still reports it at run time.
+- Two spellings: `s.subcomponent('render')` for self, `s.components.render` for every other archetype. The parent
+  side is unchanged and fully typed.
+
+**Option 2, names up front.** `.exposes('render', 'testPage')` near the top, then `.exposes((s) => ...)` at the end.
+This is `.surfaces()` with another name: completions work, and errors land on the reference.
+
+**TypeScript 7.1 doesn't help.** The [7.1 beta notes](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)
+list no inference changes. The only checker behaviour change is stricter distributive conditional types. Inference
+work there is performance only (PR 64553 caches inferences from type arguments). TypeScript 7 is a port that
+aims for parity with 6.0, so types still flow forward only, and nothing infers a later call's result back into an
+earlier one.
+
 **Not tried:** the names-first variant (`.parts('logic', ...).define(...)`). Chaining didn't hit a wall, and
 names-first repeats every part name.
 
