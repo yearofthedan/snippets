@@ -466,21 +466,32 @@ archetypes are plain data with names, `ModelView.verdict` answers for an edge th
 is built separately from rules. New fact sources add edges without touching rules, and a slots-only shorthand for
 `f.archetype` can come later.
 
+## Performance
+
+- **Unit resolution is cached.** Finding units walks the file system for markers. The result is cached and rebuilt
+  only when a file is added, removed or renamed.
+- **Graph rules run less often.** Rules that need the whole project (fan-in, cycles, `importableBy` across the
+  graph) can run at commit through their phase, while per-file rules on changed files run after every edit.
+- **Analysis is incremental.** The hook holds a TS 7.1 snapshot between calls and applies `snapshot.update()` for
+  changed files instead of rebuilding the program.
+- **There is a budget.** An edit-phase check on working title stays under 500 ms, measured in CI, so a regression is
+  visible.
+
 ## Prior art
 
-| | [Sheriff] | [eslint-plugin-boundaries] | [dependency-cruiser] | fitness (this design) |
-| --- | --- | --- | --- | --- |
-| Units | path tree with `<placeholder>` tags | flat list, glob and capture | a regex per rule | tree of archetypes, recursive |
-| Nesting | through the path tree | parent, child and sibling relationships | no | `contains`, recursive |
-| Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | globs per archetype |
-| File categories | no | yes | regex | roles, inherited |
-| Type and value edges | no | yes | yes | yes, as a `types` option |
-| Re-export chains | no | no | no | resolved to the declarer |
-| Required imports | no | no | yes | `requires` |
-| Cycles | no | no | files | files and units |
-| External packages | no | yes | yes | per slot |
-| Unit measures | no | no | no | yes |
-| Queries | no | no | no | yes |
+| | [Sheriff] | [eslint-plugin-boundaries] | [dependency-cruiser] | [Nx enforce-module-boundaries] | fitness (this design) |
+| --- | --- | --- | --- | --- | --- |
+| Units | path tree with `<placeholder>` tags | flat list, glob and capture | a regex per rule | projects, tagged in project config | tree of archetypes, recursive |
+| Nesting | through the path tree | parent, child and sibling relationships | no | no: a project is the smallest unit | `contains`, recursive |
+| Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | the project's entry point, imported by its scope | globs per archetype |
+| File categories | no | yes | regex | no | roles, inherited |
+| Type and value edges | no | yes | yes | no | yes, as a `types` option |
+| Re-export chains | no | no | no | no | resolved to the declarer |
+| Required imports | no | no | yes | no | `requires` |
+| Cycles | no | no | files | projects | files and units |
+| External packages | no | yes | yes | per tag | per slot |
+| Unit measures | no | no | no | no | yes |
+| Queries | no | no | no | project graph (`nx graph`) | yes |
 
 Borrowed: from boundaries, file categories (roles) apart from units, and parent, child and sibling relationships;
 from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces, which here are just globs
@@ -489,6 +500,7 @@ from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces
 [Sheriff]: https://github.com/softarc-consulting/sheriff
 [eslint-plugin-boundaries]: https://github.com/javierbrea/eslint-plugin-boundaries
 [dependency-cruiser]: https://github.com/sverweij/dependency-cruiser
+[Nx enforce-module-boundaries]: https://github.com/nrwl/nx/tree/master/packages/eslint-plugin
 
 ## Validation
 
