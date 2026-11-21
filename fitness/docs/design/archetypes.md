@@ -182,12 +182,12 @@ interface RoleSpec {
   rules?: RuleSettings;
 }
 
-type RuleSettings = Record<string, boolean | object | InlineRule>;   // InlineRule from f.deny or f.requires
+// 'off' is shorthand for { '*': false }: every rule off at that level, any listed beside '*' back on
+type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule from f.deny or f.requires
 
 interface FitnessConfig {
   root: Archetype;
   tsconfig?: string;             // default 'tsconfig.json'; its program is what fitness reads
-  generated?: string[];          // globs: in the model, never reported on
   plugins?: Record<string, Plugin>;
   rules?: RuleSettings;
 }
@@ -240,8 +240,10 @@ code imports (CSS, JSON, SVG) joins the unit whose folder holds it. It can be th
 apply to it, but nothing is analysed inside it. Facts come from fact sources (today, the TS analysis), so another
 source, such as CSS's own `@import`s, can add edges later without touching rules.
 
-**Generated files.** Files matching `generated` stay in the model with their edges. Rules still judge edges into
-them, such as direction and externals for their importers, but findings located in a generated file are dropped.
+**Generated files.** There is no special concept. Generated code is a role or slot with its rules off:
+`generated: f.slot({ dir: 'src/generated', rules: 'off' })`, or `rules: { '*': false, 'unit-cycle': true }` to keep a
+few. It stays a normal node: its importers are judged by their own rules (direction, externals, `importableBy`), and
+it counts in fan-in, cycles and queries. Only findings located in it are silenced.
 
 ## Edges
 
@@ -354,7 +356,6 @@ interface ModelView {
   units(): UnitView[];
   unitOf(file: string): UnitView | undefined;
   roleOf(file: string): string | undefined;
-  isGenerated(file: string): boolean;
   verdict(edge: ImportEdge): Verdict;     // the structure decision, so custom rules can reuse it
   importersOf(file: string): ImportEdge[];  // reverse index, built once
   exportsOf(file: string): ExportFacts[];
@@ -712,7 +713,7 @@ What doesn't fit well:
 ## Delivery
 
 1. Model: archetype types, finding units on the file system, `unclassified`, specificity and its errors,
-   `generated`, `fitness model`, `migrate-config`. Existing rules run on `unit` through a shim.
+   `fitness model`, `migrate-config`. Existing rules run on `unit` through a shim.
 2. Rule contract: scopes, `ModelView`, phase and `--phase`. Port the built-in rules.
 3. Structure: surfaces, roles, `importableBy`, inline rules (`f.deny`, `f.requires`), `unit-surface`,
    `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise rather than replacing it.
