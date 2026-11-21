@@ -30,10 +30,9 @@ transcripts on this machine. The transcripts and everything extracted from them 
   original note; [`compare.py`](./omp-notes/compare.py) lines runs up side by side
 - [`briefs/`](./omp-notes/briefs) — narrow reviewer briefs tested with the replay
 
-### [fitness](./fitness)
-A CLI that checks a TypeScript codebase against architectural fitness rules: module kinds, dependency direction,
-cohesion and cognitive complexity. `fitness diff` reports only what a change made new or worse, and can feed
-that to Claude Code or omp after each edit, or to GitHub code scanning as SARIF.
+### fitness, now [warp](https://github.com/yearofthedan/warp)
+The architectural fitness CLI that lived in `fitness/` moved, with its history, to
+[yearofthedan/warp](https://github.com/yearofthedan/warp). Old links into `fitness/` resolve at commit `ac92a9d`.
 
 ### [dev-skills](./plugins/dev-skills)
 A plugin of development rules and skills, published from this repo's marketplace
