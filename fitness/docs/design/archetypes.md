@@ -56,8 +56,8 @@ Seven terms, in the order they depend on each other:
 | **Archetype** | A reusable unit type. It says how its instances are found, what they expose, which file roles they have, and which slots they contain. | `component`, `hexagon` |
 | **Slot** | A named place inside a parent archetype, filled by an archetype. Slots are what `dependsOn` refers to. | `ui`, `domain`, `component` inside `ui` |
 | **Unit** | An instance of a slot in the code: a folder or a group of files. Its id is its path. | `src/ui/graph` |
-| **Role** | A file's purpose within its unit, given by its name. A file is a module in the rule contract's terms. Roles are declared on an archetype and apply to every unit below it. | `test`, `dom`, `dsl` |
-| **Edge** | One import between two files, as analysis resolved it. | `graph.ts` → `card.dom.ts` |
+| **Role** | A file's purpose within its unit, given by its name. Roles are declared on an archetype and apply to every unit below it. | `test`, `dom`, `dsl` |
+| **Edge** | One import between two files, as analysis resolved it. The rule contract calls a file a module. | `graph.ts` → `card.dom.ts` |
 | **Rule** | A check over files, units or the whole graph, against the model. It reports findings. | `dependency-direction` |
 | **Query** | A question asked of the model rather than of the code's findings. | `fitness where <file>` |
 
