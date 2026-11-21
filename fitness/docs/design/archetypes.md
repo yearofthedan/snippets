@@ -468,7 +468,7 @@ is built separately from rules. New fact sources add edges without touching rule
 
 ## Prior art
 
-| | Sheriff | eslint-plugin-boundaries | dependency-cruiser | archetypes |
+| | [Sheriff] | [eslint-plugin-boundaries] | [dependency-cruiser] | fitness (this design) |
 | --- | --- | --- | --- | --- |
 | Units | path tree with `<placeholder>` tags | flat list, glob and capture | a regex per rule | tree of archetypes, recursive |
 | Nesting | through the path tree | parent, child and sibling relationships | no | `contains`, recursive |
@@ -485,6 +485,10 @@ is built separately from rules. New fact sources add edges without touching rule
 Borrowed: from boundaries, file categories (roles) apart from units, and parent, child and sibling relationships;
 from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces, which here are just globs
 (`['index.ts']`, `['**', '!internal/**']`). `index.ts` is one possible marker or surface among others.
+
+[Sheriff]: https://github.com/softarc-consulting/sheriff
+[eslint-plugin-boundaries]: https://github.com/javierbrea/eslint-plugin-boundaries
+[dependency-cruiser]: https://github.com/sverweij/dependency-cruiser
 
 ## Validation
 
