@@ -61,7 +61,7 @@ Seven terms, in the order they depend on each other:
 | --- | --- | --- |
 | **Archetype** | A reusable unit type. It says how its instances are found, what they expose, which file roles they have, and which slots they contain. | `component`, `hexagon` |
 | **Slot** | A named place inside a parent archetype, filled by an archetype. Consumers depend on its surfaces by handle. | `ui`, `domain`, `components` inside `ui` |
-| **Unit** | An instance of a slot in the code: a folder or a group of files. Its id is its path. | `src/ui/graph` |
+| **Unit** | An instance of a slot in the code: a folder or a group of files. Its id is its path. | `src/ui/project/graph` |
 | **Role** | A file's purpose within its unit, given by its name. Roles are declared once, matched by archetypes, and given extra reach with `.with()`. A file has one role. | `test`, `dom`, `dsl` extends `test` |
 | **Edge** | One import between two files, as analysis resolved it. The rule contract calls a file a module. | `graph.ts` → `card.dom.ts` |
 | **Rule** | A check over files, units or the whole graph, against the model. It reports findings. | `dependency-direction` |
@@ -366,7 +366,7 @@ interface ModelView {
 }
 
 interface UnitView {
-  id: string;                 // its path: 'src/ui/graph'
+  id: string;                 // its path: 'src/ui/project/graph'
   slot: string;               // slot path: 'ui.components'
   archetype: string;
   captures: Record<string, string>;
@@ -404,7 +404,7 @@ Diff matches findings by key, so a key must survive edits that don't change the 
   option values stay out, so renaming a slot or moving code within a file leaves keys alone.
 - An anonymous function is named by the function around it and the call it's passed to, `src/a.ts#load>then(0)`,
   with a `#n` suffix only when two such names are identical.
-- Unit findings key on the unit id (`module-count:src/ui/graph`), and project findings on their subject
+- Unit findings key on the unit id (`module-count:src/ui/project/graph`), and project findings on their subject
   (`export-use:src/x.ts#foo`).
 - Before comparing, `diff` maps base keys through git's renames (`git diff -M --name-status`), so a moved file's
   findings carry over instead of showing as resolved and added.
