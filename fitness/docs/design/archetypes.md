@@ -177,6 +177,11 @@ surfaces: `render: s.components.render` passes the components' render files on. 
 An archetype with no `.exposes()` exposes everything. Surface names aren't declared up front; `.exposes()` is where
 they come from.
 
+The words are `exposes` and `requires`, not `exports` and `imports`, because users already write `export` and
+`import` in their files, and the config doesn't follow them. Exporting more from `card.ts` doesn't widen what other
+units may import, and a finding that said "card doesn't export cardLooks" would look false when `card.ts` plainly
+exports it. "card doesn't expose card.ts" states the architecture.
+
 **Requires and provides.** `.requires()` is an archetype's external interface, typed by archetype: `{ testRunner,
 strings: w.dir() }`, where `w.dir()` and `w.files()` stand for a part with no archetype. `.provides()` offers a part
 to anything below that requires it by that name. The nearest provider wins, and archetypes in between say nothing, so
@@ -231,10 +236,7 @@ interface FilesOptions {
   description?: string;
 }
 
-// w.dir(path: string | string[], archetype?: Archetype, options?: DirOptions)
-interface DirOptions extends FilesOptions {
-  cycles?: 'allow';              // tolerate a known cycle among its units
-}
+// w.dir(path: string | string[], archetype?: Archetype, options?: FilesOptions)
 
 // 'off' is shorthand for { '*': false }: every rule off at that level, any listed beside '*' back on
 type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule from w.deny or w.requires
@@ -330,8 +332,8 @@ utilities.
 **Cycles.** `unit-cycle` builds, for each unit, the graph of edges between its child units, and reports each loop,
 so two layers that import each other are a cycle even when no pair of files is. `no-cycle` does the same over files.
 Each reports one finding per edge in a loop, keyed `unit-cycle:src/ui->src/application` or `no-cycle:a.ts->b.ts`,
-so a loop that grows only adds findings. Type-only edges are ignored by default. A dir part with `cycles: 'allow'`
-tolerates a known loop among its units, and `where` shows it as tolerated.
+so a loop that grows only adds findings. Type-only edges are ignored by default. A known loop among a dir part's units is
+tolerated by turning the rule off on that part, `rules: { 'unit-cycle': false }`, and `where` shows it as off.
 
 ### Rules that judge the model
 
@@ -741,12 +743,12 @@ const weaver = w.archetype('weaver')
     .part('domain', w.dir('src/domain', layer, { using: (s) => [s.ports, w.pkg('node:path')] }))
     .part('utils', w.dir('src/utils', layer, { using: (s) => [s.domain, s.ports, w.pkg('*')] }))
     .part('engines', w.dir(['src/ts-engine', 'src/operations'], layer, {
-      cycles: 'allow',   // its two units use each other; see below and Open
+      rules: { 'unit-cycle': false },   // its two units use each other; see below and Open
       using: (s) => [s.domain, s.ports, s.utils, w.pkg('*')],
     }))
     .part('plugins', w.dir('src/plugins', plugins))
     .part('daemon', w.dir(['src/daemon', 'src/adapters'], layer, {
-      cycles: 'allow',
+      rules: { 'unit-cycle': false },
       using: (s) => [s.domain, s.ports, s.utils, s.engines, s.plugins, w.pkg('*')],
     }))
     .part('testHelpers', w.dir('src/__testHelpers__', undefined, {
@@ -766,7 +768,7 @@ What doesn't, mostly design smells the model brings out rather than gaps in it:
 
 - `operations/types.ts` is a contract the engines and plugins import, and `adapters/schema.ts` is one the daemon
   imports. So `ts-engine` and `operations` use each other, as do `daemon` and `adapters`. Declare-before-use can't
-  express two sibling parts that use each other, so each pair becomes one part of two units that allows the cycle
+  express two sibling parts that use each other, so each pair becomes one part of two units with `unit-cycle` off
   (how two units of one part reach each other is [open](#open)). That loses the `node:path` limit on operations (`operations-purity.test.ts` stays) and hides the
   direction inside each pair. The loops go once those contracts move to their own part.
 - `ports/` holds `NodeFileSystem` and `InMemoryFileSystem` beside the `FileSystem` interface, and `filesystem.ts`
