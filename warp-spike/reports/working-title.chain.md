@@ -1,6 +1,6 @@
 # Spike run: working-title
 
-147 files, 481 edges (118 external). Analysis 1244 ms, model + verdicts 9 ms.
+147 files, 481 edges (118 external). Analysis 1168 ms, model + verdicts 8 ms.
 
 ## Units
 
