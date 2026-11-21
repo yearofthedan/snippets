@@ -78,7 +78,7 @@ archetype ──used by──► slot ──resolves to──► unit ──cont
 ```
 
 An archetype is a type and a slot is a use of it, the way a class is used by a field. The same `component`
-archetype fills the `components` slot in `ui` and, through `self`, the `nested` slot in each component. A slot's
+archetype fills the `components` slot in `ui` and, through `self`, the `subcomponent` slot in each component. A slot's
 settings (`dependsOn`, `externals`, `rules`) belong to that place in the tree, so one archetype can be used in two
 places with different neighbours.
 
@@ -94,7 +94,7 @@ const component = f.archetype('component', (s, self) => ({
   surface: ['{name}.dom.ts'],
   rules: { 'module-cohesion': { maxLines: 150 } },
   slots: {
-    nested: f.slot({ dir: '{name}', use: self }),
+    subcomponent: f.slot({ dir: '{name}', use: self }),
   },
 }));
 
@@ -512,7 +512,7 @@ const component = f.archetype('component', (s, self) => ({
   // Another component reaches it through render<Component> and its test-facing files.
   surface: ['{name}.dom.ts', '{name}.dsl.ts', '{name}.harness.ts', '{name}.test-page.ts'],
   slots: {
-    nested: f.slot({ dir: '{name}', use: self, description: 'A component used only inside this one' }),
+    subcomponent: f.slot({ dir: '{name}', use: self, description: 'A component used only inside this one' }),
   },
 }));
 
