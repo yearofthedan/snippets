@@ -474,7 +474,7 @@ is built separately from rules. New fact sources add edges without touching rule
   graph) can run at commit through their phase, while per-file rules on changed files run after every edit.
 - **Analysis is incremental.** The hook holds a TS 7.1 snapshot between calls and applies `snapshot.update()` for
   changed files instead of rebuilding the program.
-- **There is a budget.** An edit-phase check on working title stays under 500 ms, measured in CI, so a regression is
+- **There is a budget.** An edit-phase check on working title stays under 500 ms, so a regression is
   visible.
 
 ## Prior art
