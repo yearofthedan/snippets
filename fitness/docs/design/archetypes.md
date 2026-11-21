@@ -121,12 +121,12 @@ only `dom` and test files may import a `dom` file.
 **Archetypes.** `f.archetype(name, (s, self) => spec)`. Settings sit at the top of the spec, and every key under
 `slots` is a slot, so a slot's name can never collide with a setting.
 
-**Handles, not strings.** `s` holds a handle for each of the archetype's slots and roles, by name, and `self` is the
-archetype being defined, for recursion. A handle is a placeholder resolved after the spec is built, so `s.domian` is
-a type error rather than a silent miss. Slot and role names share `s`, so they must differ.
+**Handles.** `s` holds a handle for each of the archetype's slots and roles, by name, and `self` is the archetype
+being defined, for recursion. A handle is a placeholder resolved after the spec is built, so a misspelt `s.domian` is
+a type error. Slot and role names share `s`, so they must differ.
 
-**Slots.** `f.slot({ dir, files, use, dependsOn, externals, rules })`. The key is only a name: where the slot's
-units are is always written out with `dir` or `files`, never taken from the key.
+**Slots.** `f.slot({ dir, files, use, dependsOn, externals, rules })`. The key is the slot's name, and `dir` or
+`files` says where its units are.
 
 **Roles.** `f.role({ files, extends, dependsOn, externals, importableBy, rules })`. A role can extend another and
 inherits everything the parent allows: `dsl: f.role({ files: '**/*.dsl.ts', extends: s.test })` is a test file, so
@@ -145,8 +145,8 @@ rules: {
 ```
 
 **Plain data.** The builders return data, and handles become slot paths once resolved. `--print-config` prints the
-resolved model, with every default filled in and nothing executable left except `match` functions and plugin
-rules. Finding keys and the diff cache hash that data.
+resolved model with every default filled in; `match` functions and plugin rules are the only code left in it.
+Finding keys and the diff cache hash that data.
 
 ### Types
 
@@ -196,12 +196,10 @@ interface FitnessConfig {
 A surface is a list of globs, like `externals`: `['**']` exposes everything (the default), `['**', '!internal/**']`
 hides an `internal/` folder, `['index.ts']` is a barrel, and `[]` seals the unit.
 
-`kinds` and `exclude` go. A `dir` without a placeholder is one unit; with one, it is a unit per match, and a list of
+A `dir` without a placeholder is one unit; with one, it is a unit per match, and a list of
 dirs is a unit per entry. `files` is always one unit. A slot's `dir` or `files` says where to look, and its
 archetype's `identify`, if it has one, says which of those folders count: `dir: '{name}'` with
 `marker: '{name}.dom.ts'` takes only folders that hold their own `.dom.ts`.
-
-A slots-only shorthand, where `f.archetype` takes a plain object, can be added later.
 
 ## Finding units
 
@@ -213,7 +211,7 @@ A slots-only shorthand, where `f.archetype` takes a plain object, can be added l
 4. A file has exactly one role, the most specific one that matches it.
 5. A file left among the own files of a unit with `loose: 'deny'` is `unclassified`, as today.
 
-**Most specific wins, and order never matters.** Reordering a config never changes the result.
+**Most specific wins.** Line order in the config never matters.
 
 - Slots under one parent: a literal segment beats a placeholder, which beats `**`. `ui/strings` beats `ui/{name}`,
   so `strings` isn't taken as a component.
@@ -226,13 +224,11 @@ A slots-only shorthand, where `f.archetype` takes a plain object, can be added l
 - Across levels, structure decides: a role in a nearer archetype beats one further out, as an inner name shadows an
   outer one.
 
-Finding units reads the file system, not only the TS program: a marker can be a file the program doesn't hold,
-such as `component.json`.
+Finding units reads the file system, so a marker can be a file outside the TS program, such as `component.json`.
 
 **Captures.** `{name}` matches one path segment. An archetype's templates (`marker`, `surface`) see only the unit's
-own captures, never an ancestor's, so nested components with their own `{name}` don't collide. A `match` function
-gets the whole chain for anything else. Unit ids are full paths, so a query never needs captures to tell units
-apart.
+own captures, so nested components each have their own `{name}`. A `match` function gets the whole chain for
+anything else. Unit ids are full paths, so queries identify units without captures.
 
 **What counts as a file.** The tsconfig's program: TS, JS with `allowJs`, and Vue, Svelte, Astro or MDX through
 TypeScript 7.1's `contentMappers`, which a project opts into because they run external code. A plain asset that
@@ -240,7 +236,7 @@ code imports (CSS, JSON, SVG) joins the unit whose folder holds it. It can be th
 apply to it, but nothing is analysed inside it. Facts come from fact sources (today, the TS analysis), so another
 source, such as CSS's own `@import`s, can add edges later without touching rules.
 
-**Generated files.** There is no special concept. Generated code is a role or slot with its rules off:
+**Generated files.** Generated code is a role or slot with its rules off:
 `generated: f.slot({ dir: 'src/generated', rules: 'off' })`, or `rules: { '*': false, 'unit-cycle': true }` to keep a
 few. It stays a normal node: its importers are judged by their own rules (direction, externals, `importableBy`), and
 it counts in fan-in, cycles and queries. Only findings located in it are silenced.
@@ -250,8 +246,7 @@ it counts in fan-in, cycles and queries. Only findings located in it are silence
 Analysis already resolves each import to the module that declares the names, through barrels and re-exports, and
 records `via`, whether it is type-only, and whether it is a re-export. Two additions:
 
-- **External edges:** an import of a package or a `node:` module is kept as an edge with `external: '<package>'`
-  (today it is dropped).
+- **External edges:** an import of a package or a `node:` module is kept as an edge with `external: '<package>'`.
 - **Assets:** an import of a CSS, JSON or SVG file is an edge to that file.
 
 ### How an edge is judged
@@ -287,42 +282,42 @@ the innermost out, then the global `rules`, then the rule's defaults. Options re
 reported on. Structure is a set of invariants; thresholds are tuning, which a project may want to differ between
 tests and code, or between ui components and utilities.
 
-**Edge kinds.** Edges keep whether they are type-only and whether they re-export, but the config doesn't match on
-them in general. The rules where type imports change the answer take `types: 'count' | 'ignore'`:
-`dependency-direction`, `unit-surface`, `unit-externals` and both cycle rules. Re-exports have their own rule.
+**Edge kinds.** Edges record whether they are type-only and whether they re-export. Rules where type imports
+change the answer take `types: 'count' | 'ignore'`: `dependency-direction`, `unit-surface`, `unit-externals` and
+both cycle rules. Re-exports have their own rule.
 
 **Externals.** An external edge must be allowed at every level of A's chain that sets `externals`. At each level,
 the packages A's role adds count as part of that level's list, just as a role's `dependsOn` adds to its slot's.
 Entries are package names or globs: `node:*`, `@aws-sdk/*`. Unset means that level adds no limit, so a list applies
 to the slot's whole subtree, and a child can only narrow it. The canonical case is a hexagon where only `adapters`
-may import packages. This is a property of the slot, not general package linting.
+may import packages.
 
 **Cycles.** `unit-cycle` builds, for each unit, the graph of edges between its children, and reports each loop, so
 two layers that import each other are a cycle even when no pair of files is. `no-cycle` does the same over files.
-Each reports one finding per edge in a loop, keyed `unit-cycle:src/ui->src/application` or `no-cycle:a.ts->b.ts`.
-Keying on the whole loop would make a loop that grows look resolved and then new. Type-only edges are ignored by
+Each reports one finding per edge in a loop, keyed `unit-cycle:src/ui->src/application` or `no-cycle:a.ts->b.ts`,
+so a loop that grows only adds findings. Type-only edges are ignored by
 default because they don't load at run time. A slot with `cycles: 'allow'` tolerates a known loop among its
 siblings, and `where` shows it as tolerated.
 
 ### Rules that judge the model
 
-Each failure is one finding per file pair per rule, as today.
+Each failure is one finding per file pair per rule.
 
 | Check | Rule id |
 | --- | --- |
 | direction and `importableBy` (details say which side refused) | `dependency-direction` |
-| the surface chain | `unit-surface` (new) |
+| the surface chain | `unit-surface` |
 | an inline rule | its local name |
-| re-exporting another unit's names | `no-cross-unit-reexport` (renamed; `allow` takes slot handles) |
-| a package the unit may not import | `unit-externals` (new) |
-| a loop between units | `unit-cycle` (new) |
-| a loop between files | `no-cycle` (new) |
-| a file in no unit | `unclassified` (from the model, as today) |
+| re-exporting another unit's names | `no-cross-unit-reexport` (`allow` takes slot handles) |
+| a package the unit may not import | `unit-externals` |
+| a loop between units | `unit-cycle` |
+| a loop between files | `no-cycle` |
+| a file in no unit | `unclassified` |
 
 ## Tests
 
 Test code is code, and the model treats it that way: test files belong to units, have roles, and obey `dependsOn`,
-surfaces, externals and `importableBy` like everything else. There is no built-in test rule and no `isTest` flag.
+surfaces, externals and `importableBy` like everything else.
 
 - A test file belongs to the unit it sits in, which is normally the unit it tests. That's how it reaches the unit's
   internals: they are in the same unit, so no surface applies.
@@ -375,8 +370,6 @@ interface UnitView {
 
 - A project rule runs once and looks up options per file with `optionsFor`. `undefined` means the rule is off for
   that file. Export use counts the importers of every export, then asks `optionsFor` for the file that declares it.
-- `RuleContext.kind` and `kindOf` go; plugins use `unit` and `model.unitOf` instead. The only plugin today is the
-  test fixture modelled on working title, which becomes an inline rule.
 
 **New facts**
 
@@ -398,11 +391,10 @@ Diff matches findings by key, so a key must survive edits that don't change the 
 
 - The form is `rule:subject[->object]`. A subject or object is a path, `path#symbol`, `path#Class.method`, or a unit
   id.
-- A key never holds a slot or archetype name (renaming a slot must not churn findings), a line number, a position
-  among declarations, or an option value.
+- Keys hold only paths, symbols and unit ids. Slot and archetype names, line numbers, declaration positions and
+  option values stay out, so renaming a slot or moving code within a file leaves keys alone.
 - An anonymous function is named by the function around it and the call it's passed to, `src/a.ts#load>then(0)`,
-  not by its position. A `#n` suffix is added only when two such names are identical. This settles the open issue
-  about fragile keys for callbacks.
+  with a `#n` suffix only when two such names are identical.
 - Unit findings key on the unit id (`module-count:src/ui/graph`), and project findings on their subject
   (`export-use:src/x.ts#foo`).
 - Before comparing, `diff` maps base keys through git's renames (`git diff -M --name-status`), so a moved file's
@@ -410,9 +402,9 @@ Diff matches findings by key, so a key must survive edits that don't change the 
 
 ## Rulesets
 
-Rulesets are named exports of `fitness.config.ts` that overlay the base config. They answer "when" (after each edit,
-at the PR), never "where": overlays change rules only, never structure. They name slots by typed path and roles by
-name, both checked against the base config's types:
+Rulesets are named exports of `fitness.config.ts` that overlay the base config. They answer "when": after each edit,
+or at the PR. Overlays change rules only, so the structure is the same in every ruleset. They name slots by typed
+path and roles by name, both checked against the base config's types:
 
 ```ts
 export const edit = f.ruleset(config, {
@@ -462,16 +454,17 @@ fitness may src/ui/graph/graph.ts src/domain/project.ts
 }
 ```
 
-`may` returns the verdict and every check behind it (`dependency-direction` on each side, `unit-surface`, each inline rule), and which side refused, so
-an agent can see why. Slot `description`s are what an agent reads to choose a slot for new code; the model doesn't
-guess what code means.
+`may` returns the verdict, every check behind it (`dependency-direction` on each side, `unit-surface`, each inline
+rule) and which side refused, so an agent can see why. Slot `description`s are what an agent reads to choose a slot
+for new code.
 
 ## Extending the model
 
 The model has to stay open to an act layer: codemods that add a unit, move a file or introduce a port, reading the
-same archetypes to decide what to write and gating on `diff`. Nothing here builds that. What keeps it possible:
+same archetypes to decide what to write and gating on `diff`. What keeps it possible:
 archetypes are plain data with names, `ModelView.verdict` answers for an edge that doesn't exist yet, and the model
-is built separately from rules. The same goes for new fact sources: they add edges, and rules don't change.
+is built separately from rules. New fact sources add edges without touching rules, and a slots-only shorthand for
+`f.archetype` can come later.
 
 ## Prior art
 
@@ -491,8 +484,7 @@ is built separately from rules. The same goes for new fact sources: they add edg
 
 Borrowed: from boundaries, file categories (roles) apart from units, and parent, child and sibling relationships;
 from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces, which here are just globs
-(`['index.ts']`, `['**', '!internal/**']`) rather than a convention.
-No convention is required: `index.ts` is one possible marker or surface, never assumed.
+(`['index.ts']`, `['**', '!internal/**']`). `index.ts` is one possible marker or surface among others.
 
 ## Validation
 
@@ -573,7 +565,7 @@ What fits:
 - Layer direction, a component reached only through its render file (a surface), the language and driver rules,
   the required driver-contract import, and cycles all map directly. `ui/icons` has no `icons.dom.ts`, so the
   marker rightly leaves it out of `components`.
-- "Logic not on the DOM" is `importableBy` on the `dom` role, not a rule: only `dom` files, tests and the shell may
+- "Logic not on the DOM" is `importableBy` on the `dom` role: only `dom` files, tests and the shell may
   import a `.dom.ts`.
 - "Only tests reach test code" is `importableBy: [s.test]`, inherited by every test role, and "app code may not
   import test helpers" is direction: only the `test` role depends on `testHelpers`. That's stricter than depcruise,
@@ -600,7 +592,7 @@ What doesn't fit well:
 
 ### Weaver
 
-Weaver's layers aren't a textbook hexagon's: ports at the bottom, an engine tier, operations, a daemon that
+Weaver has its own layers: ports at the bottom, an engine tier, operations, a daemon that
 dispatches, and plugins as slices.
 
 ```ts
@@ -688,18 +680,18 @@ other. That's true today but not enforced. Tests sit in their own slot, since th
 
 What doesn't fit well:
 
-- Tests in `test/` reach internals such as `rules/shared.ts` through surfaces that are mostly `['**']`. A separate test
-  tree gets less from the model than colocated tests.
+- Tests in `test/` reach internals such as `rules/shared.ts` through surfaces that are mostly `['**']`. A separate
+  test tree gets less from the model than colocated tests.
 - "Every rule folder has a README.md" is a rule about the file system, not imports. Out of scope for now.
 
 ## Migration
 
-- `kinds` is removed, not deprecated. Each kind becomes a slot under the root with `files: <its globs>`, the same
+- `kinds` is replaced. Each kind becomes a slot under the root with `files: <its globs>`, the same
   `dependsOn`, and its `rules`. That's mechanical: `fitness migrate-config` prints it, and the project nests slots
   by hand afterwards.
 - `exclude` is removed; the tsconfig decides which files are read. Today's configs exclude tests, so the first run
   after migrating will classify test files, which need roles or slots. Projects whose tsconfig leaves tests out
-  need a tsconfig that holds them. `exclude` can come back if a real need shows up.
+  need a tsconfig that holds them.
 - Overlaps between kinds, which order resolved silently, now resolve by specificity or fail as equal-specificity
   errors. A flat migration keeps globs as they are, so expect a few on the first run.
 - Today "a kind may import itself" covers every file in the kind. Inside one unit that still holds. Two units of one
@@ -708,6 +700,8 @@ What doesn't fit well:
 - Keys of existing rules keep their form (`rule:file->file`), so the first diff after migrating is quiet apart from
   the renamed rule (`no-cross-kind-reexport` to `no-cross-unit-reexport`). The diff cache key already includes the
   tool's digest, so old findings aren't reused.
+- Plugins use `unit` and `model.unitOf` in place of `RuleContext.kind` and `kindOf`. The only plugin today, the test
+  fixture modelled on working title, becomes an inline rule.
 - Ruleset overlays move from `kinds: { x: { rules } }` to `slots: { 'x': { rules } }`; `migrate-config` rewrites them.
 
 ## Delivery
@@ -716,7 +710,7 @@ What doesn't fit well:
    `fitness model`, `migrate-config`. Existing rules run on `unit` through a shim.
 2. Rule contract: scopes, `ModelView`, phase and `--phase`. Port the built-in rules.
 3. Structure: surfaces, roles, `importableBy`, inline rules (`f.deny`, `f.requires`), `unit-surface`,
-   `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise rather than replacing it.
+   `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise.
 4. Queries: `where` and `may`. Try them from omp on working title before going further, so a real consumer shapes
    what follows.
 5. Facts: external edges and assets, then `unit-externals`.
