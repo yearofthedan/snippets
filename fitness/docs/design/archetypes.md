@@ -4,20 +4,20 @@ Status: proposal. No code changes yet.
 
 ## Summary
 
-Fitness today classifies files with `kinds`: a flat list of globs, the first match wins. This design replaces them
-with **archetypes**: unit types that nest, so a config describes the codebase as a tree of modules rather than a
-list of folders. It also widens the rule contract so rules can see whole units and the whole graph, not one file
-at a time.
+Warp (renamed from fitness) classifies files today with `kinds`: a flat list of globs, the first match wins. This
+design replaces them with **archetypes**: unit types that nest, so a config describes the codebase as a tree of
+modules rather than a list of folders. It also widens the rule contract so rules can see whole units and the whole
+graph, not one file at a time.
 
 The result is one model of the codebase's modules. Lint checks code against it, and agents query it before writing
 code.
 
 ## Vision and scope
 
-Fitness is a declared model of a codebase's modules, used to keep it modular. It has four parts, with the model at
+Warp is a declared model of a codebase's modules, used to keep it modular. It has four parts, with the model at
 the core:
 
-- **The model:** the units, what each may depend on, and what each exposes.
+- **The model:** the units, the parts inside them, what each part uses, and what each unit exposes.
 - **Architecture boundaries:** direction, surfaces, re-exports, cycles, external packages.
 - **Modularity:** measures of a unit, such as cohesion, size, fan-in, and export surface and use.
 - **Code quality:** the complexity and cohesion checks that exist today. They stay.
@@ -65,7 +65,7 @@ Seven terms, in the order they depend on each other:
 | **Surface** | What a unit exposes to its parent: named groups of its parts. A file on no surface is private to its unit. | `render`, `testPage` |
 | **Edge** | One import between two files, as analysis resolved it. The rule contract calls a file a module. | `graph.ts` → `card.dom.ts` |
 | **Rule** | A check over files, units or the whole graph, against the model. It reports findings. | `dependency-direction` |
-| **Query** | A question asked of the model rather than of the code's findings. | `fitness where <file>` |
+| **Query** | A question asked of the model rather than of the code's findings. | `warp where <file>` |
 
 How they relate:
 
@@ -93,7 +93,7 @@ verbs: what it `contains`, what it `exposes` to its parent, what it `requires` f
 anything below.
 
 ```ts
-import { defineConfig, f } from 'fitness';
+import { defineConfig, f } from 'warp';
 
 const testRunner = f.archetype('test-runner', (s) => ({
   exposes: { contract: s.contract, runner: s.rest },
@@ -161,7 +161,7 @@ child exposes. A child never reaches its parent: an archetype is used in many pl
 child needs from above, it requires.
 
 `using` on an `f.dir` part applies to every file below it, so `ui: f.dir('src/ui', ui, { using: [s.application] })`
-lets every component import the application. Grants add up along the chain.
+lets every component import the application. Each dir part's `using` adds to what the files below it may use.
 
 **Surfaces.** `exposes` names what a unit offers its parent, as references to its own parts or to its children's
 surfaces: `render: s.components.render` passes the components' render files on. A file in no exposed part is private.
@@ -212,7 +212,7 @@ interface ArchetypeSpec {
   description?: string;                           // for agents choosing where code goes
 }
 
-type Ref = Handle;   // s.part, s.part.surface, required.name, required.name.surface
+type Ref = Reference;   // s.part, s.part.surface, required.name, required.name.surface
 
 // f.files(pattern: string | string[], options?: FilesOptions)
 interface FilesOptions {
@@ -230,9 +230,9 @@ interface DirOptions extends FilesOptions {
 // 'off' is shorthand for { '*': false }: every rule off at that level, any listed beside '*' back on
 type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // InlineRule from f.deny or f.requires
 
-interface FitnessConfig {
+interface WarpConfig {
   root: Archetype;
-  tsconfig?: string;             // default 'tsconfig.json'; its program is what fitness reads
+  tsconfig?: string;             // default 'tsconfig.json'; its program is what Warp reads
   plugins?: Record<string, Plugin>;
   rules?: RuleSettings;
 }
@@ -247,7 +247,7 @@ folders count: `f.dir('{name}', component)` with `marker: '{name}.dom.ts'` takes
 
 1. The root unit is the config's folder.
 2. For each unit, each `f.dir` part finds its units among the unit's own folders. A marker matches the shallowest
-   folder. Deeper matches are found when fitness looks inside that unit, if its archetype has a part that finds them.
+   folder. Deeper matches are found when Warp looks inside that unit, if its archetype has a part that finds them.
 3. A file belongs to its deepest unit, and within it to exactly one files part: the most specific that matches.
 4. A file no part matches is loose, and the unit's `loose` setting decides what that means.
 
@@ -349,7 +349,7 @@ like everything else.
   them through its children's surfaces.
 - The test runner is required by the archetypes whose tests need it and provided by the root. App code can't reach
   it, because no app part lists it.
-- A test tree kept apart from the code (fitness's own `test/`) is its own part, and its tests go through the
+- A test tree kept apart from the code (Warp's own `test/`) is its own part, and its tests go through the
   surfaces of what they test.
 - Tests cut across the tree, so every archetype that holds them declares a `test` part. Overlays, which would add a
   part to every archetype at once, are a possible later answer.
@@ -406,7 +406,7 @@ interface UnitView {
 
 **Phase.** A rule declares the earliest point at which its findings mean something. An export with no importers is
 normal halfway through a change, so `export-use` is `phase: 'commit'`, and per-file rules stay `edit`.
-`fitness diff --phase edit` skips commit-phase rules, and the omp hook passes it. `check` and plain `diff` run
+`warp diff --phase edit` skips commit-phase rules, and the omp hook passes it. `check` and plain `diff` run
 every rule. A config can change a rule's phase with the reserved option `phase`, and so can a ruleset. Phase is
 what the rule knows about itself; rulesets stay the project's tuning.
 
@@ -427,7 +427,7 @@ Diff matches findings by key, so a key must survive edits that don't change the 
 
 ## Rulesets
 
-Rulesets are named exports of `fitness.config.ts` that overlay the base config. They answer "when": after each edit,
+Rulesets are named exports of `warp.config.ts` that overlay the base config. They answer "when": after each edit,
 or at the PR. Overlays change rules only, so the structure is the same in every ruleset. They name parts by typed
 path, checked against the base config's types:
 
@@ -450,12 +450,12 @@ The model answers "where does this file sit, and what may it import?" before cod
 with `--json`; the same functions can back an MCP tool later.
 
 ```sh
-fitness model                                      # the unit tree, with every unit found
-fitness where src/ui/project/graph/graph.test.ts   # a file's unit, part and surfaces, and what it may reach
-fitness may src/ui/project/graph/graph.ts src/domain/project.ts
+warp model                                         # the unit tree, with every unit found
+warp where src/ui/project/graph/graph.test.ts      # a file's unit, part and surfaces, and what it may reach
+warp may src/ui/project/graph/graph.ts src/domain/project.ts
 ```
 
-`fitness where src/ui/project/graph/graph.test.ts --json`, with [working title's config](#working-title). Reach
+`warp where src/ui/project/graph/graph.test.ts --json`, with [working title's config](#working-title). Reach
 comes from the file's part, the dir parts above it and its requirements, so `where` shows each source:
 
 ```json
@@ -504,11 +504,11 @@ is built separately from rules. New fact sources add edges without touching rule
 
 ## Prior art
 
-| | [Sheriff] | [eslint-plugin-boundaries] | [dependency-cruiser] | [Nx enforce-module-boundaries] | fitness (this design) |
+| | [Sheriff] | [eslint-plugin-boundaries] | [dependency-cruiser] | [Nx enforce-module-boundaries] | Warp (this design) |
 | --- | --- | --- | --- | --- | --- |
 | Units | path tree with `<placeholder>` tags | flat list, glob and capture | a regex per rule | projects, tagged in project config | tree of archetypes, recursive |
 | Nesting | through the path tree | parent, child and sibling relationships | no | no: a project is the smallest unit | `contains`, recursive |
-| Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | the project's entry point, imported by its scope | named surfaces per archetype |
+| Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | the project's entry point, imported by its scope | named surfaces in `exposes` |
 | File categories | no | yes | regex | no | files parts, each with its own `using` |
 | Type and value edges | no | yes | yes | no | recorded; cycle rules can ignore type-only edges |
 | Re-export chains | no | no | no | no | resolved to the declarer |
@@ -543,7 +543,7 @@ beside them in `ui`. Its tsconfig includes `**/*.ts`, so the config models `e2e/
 too, and the root CSS files (`reset.css`, `shell.css`, `tokens.css`) are in `src/`.
 
 ```ts
-import { defineConfig, f } from 'fitness';
+import { defineConfig, f } from 'warp';
 
 const testRunner = f.archetype('test-runner', (s) => ({
   exposes: { contract: s.contract, runner: s.rest },
@@ -725,7 +725,7 @@ const weaver = f.archetype('weaver', (s) => ({
   },
 }));
 
-export default defineConfig({ root: weaver, tsconfig: 'tsconfig.fitness.json' });   // see below
+export default defineConfig({ root: weaver, tsconfig: 'tsconfig.warp.json' });   // see below
 ```
 
 What fits: the tiers, and plugins as slices: the `plugin` part doesn't list itself, so a Svelte plugin couldn't
@@ -743,10 +743,12 @@ What doesn't, mostly design smells the model brings out rather than gaps in it:
   `ports`, and the re-export would become a `no-cross-unit-reexport` finding.
 - `operations` imports `safe-regex2`, which its `externals` reports. That needs a decision, not a config change.
 - Weaver's `tsconfig.json` leaves tests out and `tsconfig.test.json` holds only tests, so modelling both needs a
-  tsconfig that includes both. Either fitness accepts a list of tsconfigs or the project adds one.
+  tsconfig that includes both. Either Warp accepts a list of tsconfigs or the project adds one.
 - `src/cli-workspace-default.integration.test.ts` sits at the root of `src`, in no part, and is `unclassified`.
 
-### Fitness
+### Warp itself
+
+Warp's own package, still at `fitness/` in snippets.
 
 ```ts
 const rule = f.archetype('rule', (s) => ({
@@ -772,7 +774,7 @@ const model = f.archetype('model', (s) => ({
   },
 }));
 
-const fitness = f.archetype('fitness', (s) => ({
+const warp = f.archetype('warp', (s) => ({
   loose: 'deny',
   contains: {
     model: f.dir('src/model', model, { externals: ['node:path'] }),
@@ -790,7 +792,7 @@ const fitness = f.archetype('fitness', (s) => ({
   },
 }));
 
-export default defineConfig({ root: fitness });
+export default defineConfig({ root: warp });
 ```
 
 What fits, and says more than today's kinds: the model's core can't import the rules nested inside it, rules can't
@@ -845,7 +847,7 @@ What fits: a module is a unit found by its marker, and `api` stands in for its `
 another's service and DTOs but never its controller or repository. Controllers go through services, because
 `controller` doesn't list `repository`. Modules that import each other (Nest's `forwardRef`) are a `unit-cycle`.
 
-What doesn't: Nest's real boundary is the `@Module` metadata, which fitness doesn't read. A module that imports a
+What doesn't: Nest's real boundary is the `@Module` metadata, which Warp doesn't read. A module that imports a
 service's class but doesn't list its module in `imports` passes here and fails at run time. Apps laid out by type
 (`controllers/`, `services/`) need a different config, with parts doing the work of units.
 
@@ -887,7 +889,7 @@ Folders holding several components side by side stay out of scope: they would ne
 ## Migration
 
 - `kinds` is replaced. Each kind becomes a files part of the root with its globs, its `dependsOn` as `using`, and its
-  `rules`. That's mechanical: `fitness migrate-config` prints it, and the project nests parts by hand afterwards.
+  `rules`. That's mechanical: `warp migrate-config` prints it, and the project nests parts by hand afterwards.
 - `exclude` is removed; the tsconfig decides which files are read. Today's configs exclude tests, so the first run
   after migrating will classify test files, which need parts. Projects whose tsconfig leaves tests out
   need a tsconfig that holds them.
@@ -906,7 +908,7 @@ Folders holding several components side by side stay out of scope: they would ne
 ## Delivery
 
 1. Model: archetype types, finding units on the file system, `unclassified`, specificity and its errors,
-   `fitness model`, `migrate-config`. Existing rules run on `unit` through a shim.
+   `warp model`, `migrate-config`. Existing rules run on `unit` through a shim.
 2. Rule contract: scopes, `ModelView`, phase and `--phase`. Port the built-in rules.
 3. Structure: parts, surfaces, `using`, requires and provides with their checks, inline rules (`f.deny`,
    `f.requires`), `no-cross-unit-reexport`, `unit-cycle`, `no-cycle`. Working title's config lands here, reporting beside depcruise.
@@ -924,7 +926,7 @@ Folders holding several components side by side stay out of scope: they would ne
 3. **Per-function rules stay per function.** `cognitive-complexity` and `function-cohesion` take thresholds per part.
    Whether they roll up into unit measures is decided later, with working title's data.
 4. **No severity.** The project decides what fails, and the diff ratchet covers the rest.
-5. **No oxlint or Biome adapter.** A fitness language server is a possible later path for editor feedback, whatever
+5. **No oxlint or Biome adapter.** A Warp language server is a possible later path for editor feedback, whatever
    the linter.
 6. **Architectures not laid out in folders are a known limit,** such as a boundary that exists only in a DI container
    or a package's `exports` map. Files parts cover naming inside units, and `match` covers folders a marker can't.
