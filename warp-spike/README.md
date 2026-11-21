@@ -10,7 +10,8 @@ every archetype.
 pnpm install && (cd ../fitness && pnpm install)
 pnpm typecheck                                    # builders + both configs
 pnpm probe                                        # fails on purpose: prints the error messages
-node probe/completions.ts                         # asks TS 7.1's language server for completions
+node probe/completions.ts [target]                # asks TS 7.1's language server for completions
+node probe/contains-shape.ts                      # nested .contains() builds the same data as the flat chain
 node src/main.ts ../../working-title configs/working-title.ts --where > reports/working-title.md
 ```
 
@@ -110,7 +111,71 @@ What the 48 extra findings in the doc's config were, i.e. what it took to fit re
   cycle inside a component); harness needs `vite-plus`; test-helpers → `ports`; layer tests → `methods`; e2e
   journeys need `ui` to expose `dsl`.
 
-## What hurt to write
+## 4. Chained builder (round two)
+
+Dan didn't like section 1's shape, since `using` moves off the part. Round two tries a chain where each part sees
+the parts declared before it: `src/chain.ts`, `configs/working-title.chain.ts`.
+
+```ts
+export const component = c.archetype('component')
+  .identify({ marker: '{name}.dom.ts' })
+  .surfaces('render', 'testPage', 'dsl')
+  .requires({ testRunner, application: layer, ports: c.dir(), strings: c.dir(), icons: c.dir(), transition: c.files([]) })
+  .part('subcomponent', (_, { self }) => c.dir('{name}', self))
+  .part('logic', (_, { required }) => c.files('*.ts', { using: [required.strings, required.application] }))
+  .part('dom', (s, { required }) => c.files('{name}.dom.ts', { using: [s.logic, s.subcomponent.render, required.icons, ...] }))
+  ...
+  .exposes((s) => ({ render: s.dom, testPage: s.testPage, dsl: s.dsl }));
+```
+
+Dan's nested variant, `.contains(({ required, self }) => c.parts().part(...).part(...))`, types the same way and
+builds identical data (`probe/contains-shape.ts`). The two differ only in how they read.
+
+**Results.** Working title gives the same 17 findings as the tuned config, and the config is 84 lines against 142.
+No inference tricks are involved: each `.part()` call's types are already fixed when its callback runs.
+
+- **Completions** (`node probe/completions.ts probe/completion-target.chain.ts`): `s.` lists only the parts declared
+  so far. The rest match round one, including the `kind` leak.
+- **Errors** (`probe/chain-errors.ts`): all 8 mistakes are caught at the reference: misspelt part, a part declared
+  further down, an undeclared requirement, misspelt surfaces, and `exposes` missing a declared surface. A duplicate
+  part reads `Argument of type '"dom"' is not assignable to parameter of type '"part 'dom' is already declared"'`.
+  The ugly `using`-key error from round one is gone, because there's no separate map. One weak message: a part
+  used before it's declared just says it "does not exist".
+
+**`self` needs surface names up front.** Types only flow forward, so parts can't see an `exposes` that comes after
+them. A recursive archetype declares `.surfaces('render', 'testPage', 'dsl')` first. `self` carries those names, so
+`s.subcomponent.render` types, and `exposes` is checked to define exactly those surfaces. Leaving out `.surfaces()`
+gives `'render' does not exist on type 'SurfaceRefs<{}>'`, which doesn't name the cause. Only recursive archetypes
+need it. A parent reads a child archetype's surfaces from the finished chain, as before.
+
+**`requires` and `provides`.** `.requires()` goes before the parts, and every part callback gets `{ required }`.
+`.provides()` and `.exposes()` go at the end. This order is natural, not a trap: calling `requires` late is a type
+error in the earlier parts.
+
+**Declare-before-use.**
+- **Parts that need each other.** The runner's contract (`driver`, `steps`, `seed`, `narrowing`) imports
+  `scenario-file.ts` and `ids.ts` from `rest`, and `rest` imports the contract. A chain can't express that cycle,
+  so those two files moved into the contract. That ripples: layer tests import `ids.ts`, so layer tests now list
+  `required.testRunner.contract` as well. Whether this is a cost or a feature depends on whether a cycle between
+  sibling parts should be legal. The model never said.
+- **testPage and harness.** The doc gave `testPage` access to the harness, but no test page imports one. Only
+  harness imports test page, so the chain order works: testPage, then harness.
+- **Test parts that need everything** go last, which reads naturally. The `using` lists stay long, at 11 and 9
+  entries, so a shorthand for the whole unit is still worth it.
+- **Order no longer matches reading order.** `subcomponent` has to come before `dom`, and the root has to declare
+  `domain`, `ports`, `methods` and `application` before `ui`, `shell` and `app`. That's dependency order, which is
+  arguably the architecture. But it means you can't group parts by theme, for example tests last.
+
+**How it reads against the doc shape.** Each line is one part, its pattern and what it uses, which is what the doc
+wanted. Callbacks are the noise: `(s, { required }) =>` appears on most lines, and `(_, { self })` is awkward. The
+nested `.contains()` variant puts `required` and `self` in one scope, so most parts take only `(s) =>`. It reads
+closer to the doc, with one extra level of nesting. If the flat form is kept, passing `required` through `s`
+(`s.$required.strings`) would remove the second argument.
+
+**Not tried:** the names-first variant (`.parts('logic', ...).define(...)`). Chaining didn't hit a wall, and
+names-first repeats every part name.
+
+## What hurt to write (round one)
 
 1. **Plumbing for shared things.** `application` and `ports` for components, `methods` for layer tests, `ui` for
    journeys: each is `provides` at the root + `requires` in the archetype + an entry per part. The tuned config

@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 const pnpm = resolve('node_modules/.pnpm');
 const native = readdirSync(pnpm).find((d) => d.startsWith('@typescript+typescript-linux'))!;
 const exe = join(pnpm, native, 'node_modules/@typescript', native.split('+')[1]!.split('@')[0]!, 'lib/tsc');
-const file = resolve('probe/completion-target.ts');
+const file = resolve(process.argv[2] ?? 'probe/completion-target.ts');
 const uri = pathToFileURL(file).href;
 const text = readFileSync(file, 'utf8');
 

@@ -20,7 +20,7 @@ export const self = { self: true } as unknown as SelfMarker;
 
 export interface FilesPart { readonly kind: 'files'; readonly patterns: string[] }
 export interface DirPart<A = undefined> { readonly kind: 'dir'; readonly paths: string[]; readonly archetype: A }
-export type Part = FilesPart | DirPart<AnyArchetype | SelfMarker | undefined>;
+export type Part = FilesPart | DirPart<any>;
 
 export interface ArchetypeData {
   name: string;
