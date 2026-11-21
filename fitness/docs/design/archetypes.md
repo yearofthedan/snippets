@@ -91,7 +91,7 @@ import { defineConfig, f } from 'fitness';
 
 const component = f.archetype('component', (s, self) => ({
   identify: { marker: '{name}.dom.ts' },
-  surface: '{name}.dom.ts',
+  surface: ['{name}.dom.ts'],
   rules: { 'module-cohesion': { maxLines: 150 } },
   slots: {
     nested: f.slot({ dir: '{name}', use: self }),
@@ -153,7 +153,7 @@ rules. Finding keys and the diff cache hash that data.
 ```ts
 interface ArchetypeSpec {
   identify?: { marker: string } | { match: (dir: string, chain: UnitView[]) => false | Record<string, string> };
-  surface?: 'any' | string | string[] | { internal: string };   // default 'any'; { internal: 'internal' }: all but that folder
+  surface?: string[];            // globs outsiders may import; default ['**'], [] is sealed
   roles?: Record<string, Role>;
   slots?: Record<string, Slot>;
   externals?: string[];
@@ -192,6 +192,9 @@ interface FitnessConfig {
   rules?: RuleSettings;
 }
 ```
+
+A surface is a list of globs, like `externals`: `['**']` exposes everything (the default), `['**', '!internal/**']`
+hides an `internal/` folder, `['index.ts']` is a barrel, and `[]` seals the unit.
 
 `kinds` and `exclude` go. A `dir` without a placeholder is one unit; with one, it is a unit per match, and a list of
 dirs is a unit per entry. `files` is always one unit. A slot's `dir` or `files` says where to look, and its
@@ -443,9 +446,9 @@ fitness may src/ui/graph/graph.ts src/domain/project.ts
   "onSurface": false,
   "mayImport": [
     { "slot": "ui.components", "units": ["src/ui/card", "src/ui/panel", "src/ui/project", "src/ui/your-projects"], "surface": ["{name}.dom.ts", "{name}.dsl.ts", "{name}.harness.ts", "{name}.test-page.ts"], "types": "ignore" },
-    { "slot": "ui.strings", "units": ["src/ui/strings"], "surface": "any" },
-    { "slot": "ui.icons", "units": ["src/ui/icons"], "surface": "any" },
-    { "slot": "application", "units": ["src/application"], "surface": "any" }
+    { "slot": "ui.strings", "units": ["src/ui/strings"], "surface": ["**"] },
+    { "slot": "ui.icons", "units": ["src/ui/icons"], "surface": ["**"] },
+    { "slot": "application", "units": ["src/application"], "surface": ["**"] }
   ],
   "externals": [],
   "mayNotImport": [
@@ -475,7 +478,7 @@ is built separately from rules. The same goes for new fact sources: they add edg
 | --- | --- | --- | --- | --- |
 | Units | path tree with `<placeholder>` tags | flat list, glob and capture | a regex per rule | tree of archetypes, recursive |
 | Nesting | through the path tree | parent, child and sibling relationships | no | `contains`, recursive |
-| Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | chosen per archetype |
+| Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | globs per archetype |
 | File categories | no | yes | regex | roles, inherited |
 | Type and value edges | no | yes | yes | yes, as a `types` option |
 | Re-export chains | no | no | no | resolved to the declarer |
@@ -486,7 +489,8 @@ is built separately from rules. The same goes for new fact sources: they add edg
 | Queries | no | no | no | yes |
 
 Borrowed: from boundaries, file categories (roles) apart from units, and parent, child and sibling relationships;
-from Sheriff, the placeholder syntax and barrel and internal-folder surfaces, as choices rather than a convention.
+from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces, which here are just globs
+(`['index.ts']`, `['**', '!internal/**']`) rather than a convention.
 No convention is required: `index.ts` is one possible marker or surface, never assumed.
 
 ## Validation
@@ -683,7 +687,7 @@ other. That's true today but not enforced. Tests sit in their own slot, since th
 
 What doesn't fit well:
 
-- Tests in `test/` reach internals such as `rules/shared.ts` through surfaces that are mostly `any`. A separate test
+- Tests in `test/` reach internals such as `rules/shared.ts` through surfaces that are mostly `['**']`. A separate test
   tree gets less from the model than colocated tests.
 - "Every rule folder has a README.md" is a rule about the file system, not imports. Out of scope for now.
 
