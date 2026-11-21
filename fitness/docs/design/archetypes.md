@@ -111,23 +111,24 @@ const component = f.archetype('component', (s, self) => ({
 
 const app = f.archetype('app', (s) => ({
   roles: {
-    test,
-    dom: dom.with({ dependsOn: [s.components.render] }),
+    test: test.with({ dependsOn: [s.testRunner] }),
+    dom,
   },
   slots: {
     domain: f.slot({ dir: 'src/domain', externals: [] }),
     application: f.slot({ dir: 'src/application', dependsOn: [s.domain], externals: [] }),
     components: f.slot({ dir: 'src/ui/{name}', use: component, dependsOn: [s.application] }),
+    testRunner: f.slot({ dir: 'src/test-helpers', dependsOn: [s.domain, s.application] }),
   },
 }));
 
 export default defineConfig({ root: app, rules: { 'cognitive-complexity': { max: 15 } } });
 ```
 
-Read it as: the project holds a domain, an application and some components. A component is a folder under
-`src/ui/` that holds `<folder>.dom.ts`, which is its `render` surface; its other files are private. A component may
-import the application, and may hold more components. Only `dom` files may reach other components' `render`
-files, and inside a component only `dom` and test files may import a `dom` file.
+Read it as: the project holds a domain, an application, some components and a test runner. A component is a folder
+under `src/ui/` that holds `<folder>.dom.ts`, which is its `render` surface; its other files are private. A
+component may import the application, and holds the components it renders, whose `render` files it reaches. Only
+test files may import the test runner, and inside a component only `dom` and test files may import a `dom` file.
 
 **Archetypes.** `f.archetype(name, (s, self) => spec)`. Settings sit at the top of the spec, and every key under
 `slots` is a slot, so a slot's name can never collide with a setting.
@@ -150,8 +151,8 @@ target side grants or refuses reach: the target only decides what is on its surf
 
 **Roles.** `f.role({ files, extends, externals, rules })` is declared once, at the top of the config. An archetype
 lists the roles it matches in `roles`. A parent that can see a target grants a role extra reach with `.with()`:
-`dom.with({ dependsOn: [s.components.render] })` lets `dom` files anywhere below `app` import components' render
-files. A role is identified by its object: every `.with()` of `dom` is still `dom`, and a file's role carries the
+`test.with({ dependsOn: [s.testRunner] })` lets test files anywhere below `app` import the test runner. A role is
+identified by its object: every `.with()` of `test` is still `test`, and a file's role carries the
 grants of every `.with()` on its chain of archetypes, merged. `extends` makes a role a kind of another, so
 `dsl: f.role({ files: '**/*.dsl.ts', extends: test })` gets every grant `test` gets.
 
@@ -432,32 +433,31 @@ with `--json`; the same functions can back an MCP tool later.
 
 ```sh
 fitness model                         # the unit tree, with every unit found
-fitness where src/ui/graph/graph.dom.ts  # a file's unit, role and surfaces, and what it may reach
-fitness may src/ui/graph/graph.ts src/domain/project.ts
+fitness where src/ui/project/graph/graph.test.ts  # a file's unit, role and surfaces, and what it may reach
+fitness may src/ui/project/graph/graph.ts src/domain/project.ts
 ```
 
-`fitness where src/ui/graph/graph.dom.ts --json`, with [working title's config](#working-title). A role's meaning
-is split between where it is matched and where it is granted reach, so `where` shows the merged result and where
-each grant comes from:
+`fitness where src/ui/project/graph/graph.test.ts --json`, with [working title's config](#working-title). A role's
+meaning is split between where it is matched and where it is granted reach, so `where` shows the merged result and
+where each grant comes from:
 
 ```json
 {
-  "file": "src/ui/graph/graph.dom.ts",
-  "unit": { "id": "src/ui/graph", "slot": "ui.components", "archetype": "component", "captures": { "name": "graph" } },
-  "chain": [".", "src/ui", "src/ui/graph"],
-  "role": "dom",
-  "surfaces": ["render"],
+  "file": "src/ui/project/graph/graph.test.ts",
+  "unit": { "id": "src/ui/project/graph", "slot": "ui.components.subcomponent", "archetype": "component", "captures": { "name": "graph" } },
+  "chain": [".", "src/ui", "src/ui/project", "src/ui/project/graph"],
+  "role": "test",
+  "surfaces": [],
   "reach": [
-    { "from": "own unit", "units": ["src/ui/graph"] },
-    { "from": "slot ui.components", "surfaces": ["ui.strings", "ui.transition"] },
+    { "from": "own unit", "units": ["src/ui/project/graph"] },
+    { "from": "children", "surfaces": ["src/ui/project/graph/card: render, testing"] },
+    { "from": "slot ui.components", "surfaces": ["ui.strings", "ui.icons"] },
     { "from": "slot ui", "surfaces": ["application"] },
-    { "from": "role dom, granted by working-title", "surfaces": ["ui.render"] }
+    { "from": "role test, granted by working-title", "surfaces": ["ui.testing", "testRunner"] }
   ],
-  "externals": [],
+  "externals": ["vite-plus/*", "@playwright/*"],
   "rules": ["logic-not-on-the-dom"],
-  "reachableFrom": [
-    { "via": "ui.render", "by": ["role dom", "slot shell"] }
-  ]
+  "reachableFrom": []
 }
 ```
 
@@ -513,13 +513,16 @@ from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces
 
 ## Validation
 
-Configs written against each repo as of 2026-11-21. A preset is an archetype like any other, so a project either
+Configs written against each repo as of 2026-11-21 (working title at `cb16dd5`). A preset is an archetype like any other, so a project either
 uses one as a slot's `use` or writes the shape out, as all three configs below do.
 
 ### Working title
 
-This replaces every rule in `.dependency-cruiser.mjs`, `no-circular` included. Its tsconfig includes `**/*.ts`, so
-the config models `e2e/`, `lint/` and the root's own files too.
+This replaces every rule in `.dependency-cruiser.mjs`, `no-circular` included. Components are strictly nested: each
+sits inside the one that renders it (`project` holds `graph`, which holds `card`, and `panel`; `your-projects` holds
+`project-list`, which holds `start-a-project`, and `projects-folder`). `icons` and `strings` sit beside them in
+`ui`. Its tsconfig includes `**/*.ts`, so the config models `e2e/`, `lint/` and the root's own files too, and the
+root CSS files (`reset.css`, `shell.css`, `tokens.css`) are in `src/`.
 
 ```ts
 import { defineConfig, f } from 'fitness';
@@ -548,16 +551,15 @@ const component = f.archetype('component', (s, self) => ({
 
 const ui = f.archetype('ui', (s) => ({
   surface: {
-    render: [s.components.render, s.icons],
+    render: [s.components.render],     // the top-level components, for the shell
     testing: [s.components.testing],
     words: [s.strings],
   },
   rules: { 'dependency-direction': { types: 'ignore' } },   // types from a component's private modules are fine
   slots: {
-    components: f.slot({ dir: '{name}', use: component, dependsOn: [s.strings, s.transition] }),
+    components: f.slot({ dir: '{name}', use: component, dependsOn: [s.strings, s.icons] }),
     strings: f.slot({ dir: 'strings', description: "The app's words" }),
     icons: f.slot({ dir: 'icons' }),
-    transition: f.slot({ files: 'transition.ts' }),
   },
 }));
 
@@ -566,7 +568,7 @@ const workingTitle = f.archetype('working-title', (s) => ({
   roles: {
     test: test.with({ dependsOn: [s.ui.testing, s.testRunner] }),
     dsl, harness, testPage, driver, driverContract, journey,
-    dom: dom.with({ dependsOn: [s.ui.render] }),
+    dom,
   },
   rules: {
     'no-cycle': { types: 'count' },   // as depcruise, which counts type imports
@@ -582,7 +584,7 @@ const workingTitle = f.archetype('working-title', (s) => ({
     methods: f.slot({ dir: 'src/methods', dependsOn: [s.domain], externals: [], description: 'Method definitions as data' }),
     shell: f.slot({
       files: ['src/main.ts', 'src/app.ts', 'src/shell.ts', 'src/*.css'],
-      dependsOn: [s.application, s.adapters, s.methods, s.ui.render, s.ui.words],
+      dependsOn: [s.application, s.adapters, s.ports, s.methods, s.ui.render, s.ui.words],
       externals: ['virtual:*'],
     }),
     testRunner: f.slot({
@@ -590,7 +592,7 @@ const workingTitle = f.archetype('working-title', (s) => ({
       dependsOn: [s.domain, s.application, s.adapters, s.methods, s.shell, s.ui.render, s.ui.testing],
       externals: ['*'],
     }),
-    e2e: f.slot({ dir: 'e2e', dependsOn: [s.ui.testing, s.testRunner], externals: ['*'], description: 'Journeys against the built app' }),
+    e2e: f.slot({ dir: 'e2e', dependsOn: [s.adapters, s.ui.testing, s.testRunner], externals: ['*'], description: 'Journeys against the built app' }),
     lint: f.slot({ dir: 'lint', externals: ['*'] }),
     tooling: f.slot({ files: ['*.ts', 'scripts/**/*.ts'], dependsOn: [s.lint], externals: ['*'] }),
   },
@@ -603,38 +605,38 @@ How some edges come out:
 
 | Edge | Verdict | Why |
 | --- | --- | --- |
-| `graph/graph.dom.ts` → `card/card.dom.ts` | ✅ | `dom` is granted `ui.render`, which holds every component's `render` |
-| `graph/graph.ts` → `card/card.dom.ts` | ❌ | only `dom` is granted `ui.render` |
-| `graph/graph.test.ts` → `card/card.harness.ts` | ✅ | `test` is granted `ui.testing` |
-| `graph/graph.ts` → `card/card.harness.ts` | ❌ | only `test` is granted `ui.testing` |
-| `graph/graph.ts` → `card/card.ts` | ❌ | `card.ts` is on no surface, so it's private to `card` (a type-only import passes, through `types: 'ignore'`) |
-| `card/card.ts` → `card/card.dom.ts` | ❌ | same unit, but `logic-not-on-the-dom` forbids it |
-| `your-projects.dom.ts` → `project-list/project-list.dom.ts` | ✅ | a parent reaches the surfaces of the units it contains |
-| `graph/graph.dom.ts` → `your-projects/project-list/project-list.dom.ts` | ❌ | `your-projects` doesn't pass its subcomponents on in `render` |
-| `src/app.ts` → `card/card.dom.ts` | ✅ | the shell depends on `ui.render` |
+| `project/project.dom.ts` → `project/graph/graph.dom.ts` | ✅ | a parent reaches the surfaces of the units it contains |
+| `project/project.dom.ts` → `project/graph/card/card.dom.ts` | ❌ | `card` is inside `graph`, and `graph` doesn't pass it on in `render` |
+| `project/graph/graph.dom.ts` → `project/panel/panel.dom.ts` | ❌ | siblings: nothing grants `graph` reach to `panel` |
+| `project/graph/card/card.dom.ts` → `icons/open-beside.dom.ts` | ✅ | `components` depends on `icons`, and `card` is below it |
+| `project/graph/card/card.ts` → `icons/open-beside.dom.ts` | ❌ | `logic-not-on-the-dom` |
+| `project/graph/card/card.ts` → `project/graph/card/card.dom.ts` | ❌ | same unit, but `logic-not-on-the-dom` forbids it |
+| `project/graph/graph.test.ts` → `project/graph/card/card.harness.ts` | ✅ | a parent reaches its child's `testing` surface |
+| `src/app.ts` → `project/project.dom.ts` | ✅ | the shell depends on `ui.render`, which holds the top-level components |
+| `src/app.ts` → `project/graph/card/card.dom.ts` | ❌ | `card` isn't in `ui.render` |
 | `domain/project.ts` → `test-helpers/staging.ts` | ❌ | domain depends on nothing, and isn't `test` |
 
 What fits:
 
 - Layer direction, a component reached only through its render file, logic-not-on-the-dom, the language and driver
   rules, the required driver-contract import, and cycles all map directly. `ui/icons` has no `icons.dom.ts`, so the
-  marker leaves it out of `components`, and `ui` passes it on in `render`.
-- `dom` composing `dom` across components falls out of one grant, with no rule. Utilities stay one-directional:
-  components depend on `strings` and `transition`, which depend on nothing.
+  marker leaves it out of `components`.
+- The nesting is the reach: a component reaches only its direct children, and `icons` and `strings` are the shared
+  utilities every component may use. Utilities stay one-directional, since they depend on nothing. No sibling
+  component imports exist in the code, and the config refuses them.
 - Only tests reach test code and the runner, because only `test` is granted them. That's stricter than depcruise,
   which forbade only drivers, languages and harnesses.
-- Nested components come from `self`, and stay private to their parent unless it passes them on.
-- The shell lists exactly what it wires together.
+- The shell lists exactly what it wires together, and reaches only the top-level components.
 - The ui reaching a port through application's re-export is a `dependency-direction` finding on each ui importer,
   since edges resolve to the declarer, and a `no-cross-unit-reexport` finding on application.
 
-`src/test-helpers/` is due to move into component folders. When it does, each component's harness, test page and
-driver become files with those roles inside the component, and the config barely changes: the roles match by name
-wherever the files are, and `driver.ts` files join each component's `testing` surface. Only the generic runner stays
-in `testRunner`.
+What doesn't fit well, and what it says about the structure:
 
-What doesn't fit well:
-
+- `src/test-helpers/` reaches into `card` (`graph-page.ts` and its neighbours import `card.ts` and
+  `card.test-page.ts`), which the config refuses: `card` is private to `graph`. That is the structure smell the
+  planned move fixes. Once each component's harness, test page and driver live in its folder, those files join the
+  component's `testing` surface and are reached through its parent, and only the generic runner stays in
+  `testRunner`.
 - `types: 'ignore'` on `ui` lets every type-only import from ui files through, including types from domain, which
   depcruise counted. Keeping types from a component's private modules allowed without that needs a surface for
   types, which the config doesn't have.
