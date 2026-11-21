@@ -152,7 +152,8 @@ target side grants or refuses reach: the target only decides what is on its surf
 
 **Roles.** `f.role({ files, extends, externals, rules })` is declared once, at the top of the config. An archetype
 lists the roles it matches in `roles`. A parent that can see a target grants a role extra reach with `.with()`:
-`test.with({ dependsOn: [s.testRunner] })` lets test files anywhere below `app` import the test runner. A role is
+`test.with({ dependsOn: [s.testRunner] })` lets test files anywhere below `app` import the test runner. A role's
+globs match paths inside the unit whose archetype lists it, and it applies to that unit's whole subtree. A role is
 identified by its object: every `.with()` of `test` is still `test`, and a file's role carries the
 grants of every `.with()` on its chain of archetypes, merged. `extends` makes a role a kind of another, so
 `dsl: f.role({ files: '**/*.dsl.ts', extends: test })` gets every grant `test` gets.
@@ -539,9 +540,15 @@ const test = f.role({ files: '**/*.test.ts', externals: ['vite-plus/*', '@playwr
 const dsl = f.role({ files: '**/*.dsl.ts', extends: test });
 const harness = f.role({ files: '**/*.harness.ts', extends: test });
 const testPage = f.role({ files: '**/*.test-page.ts', extends: test });
-const driver = f.role({ files: '**/*.driver.ts', extends: test });
-const driverContract = f.role({ files: 'src/test-helpers/driver.ts', extends: test });
+const driver = f.role({ files: '*.driver.ts', extends: test });
+const driverContract = f.role({ files: 'driver.ts', extends: test });
 const dom = f.role({ files: '**/*.dom.ts' });
+
+// languages live in components and in e2e, so both archetypes take these rules
+const languageRules = {
+  'dsl-not-on-a-driver': f.deny({ from: dsl, to: driver }),
+  'dsl-on-the-driver-contract': f.requires({ from: dsl, to: driverContract }),
+};
 
 const component = f.archetype('component', (s, self) => ({
   identify: { marker: '{name}.dom.ts' },
@@ -549,8 +556,11 @@ const component = f.archetype('component', (s, self) => ({
     render: ['{name}.dom.ts'],
     testing: ['{name}.dsl.ts', '{name}.harness.ts', '{name}.test-page.ts'],
   },
-  roles: { dom, test },
-  rules: { 'logic-not-on-the-dom': f.deny({ from: { roleNot: [dom, test] }, to: dom }) },
+  roles: { dsl, harness, testPage },
+  rules: {
+    ...languageRules,
+    'logic-not-on-the-dom': f.deny({ from: { roleNot: [dom, test] }, to: dom }),
+  },
   slots: {
     subcomponent: f.slot({ dir: '{name}', use: self, description: 'A component used only inside this one' }),
   },
@@ -562,6 +572,7 @@ const ui = f.archetype('ui', (s) => ({
     testing: [s.components.testing],
     words: [s.strings],
   },
+  roles: { dom },                      // here, not in component, so icons' .dom.ts files are dom too
   slots: {
     components: f.slot({ dir: '{name}', use: component, dependsOn: [s.strings, s.icons] }),
     strings: f.slot({ dir: 'strings', description: "The app's words" }),
@@ -569,18 +580,19 @@ const ui = f.archetype('ui', (s) => ({
   },
 }));
 
+const testRunner = f.archetype('test-runner', () => ({
+  roles: { driver, driverContract },   // drivers move to their components with test-helpers
+}));
+
+const journeys = f.archetype('journeys', () => ({
+  roles: { dsl },
+  rules: languageRules,
+}));
+
 const workingTitle = f.archetype('working-title', (s) => ({
   loose: 'deny',
-  roles: {
-    test: test.with({ dependsOn: [s.ui.testing, s.testRunner] }),
-    dsl, harness, testPage, driver, driverContract,
-    dom,
-  },
-  rules: {
-    'no-cycle': { types: 'count' },   // as depcruise, which counts type imports
-    'dsl-not-on-a-driver': f.deny({ from: dsl, to: driver }),
-    'dsl-on-the-driver-contract': f.requires({ from: dsl, to: driverContract }),
-  },
+  roles: { test: test.with({ dependsOn: [s.ui.testing, s.testRunner] }) },
+  rules: { 'no-cycle': { types: 'count' } },   // as depcruise, which counts type imports
   slots: {
     domain: f.slot({ dir: 'src/domain', externals: [] }),
     ports: f.slot({ dir: 'src/ports', dependsOn: [s.domain], externals: [] }),
@@ -595,12 +607,14 @@ const workingTitle = f.archetype('working-title', (s) => ({
     }),
     testRunner: f.slot({
       dir: 'src/test-helpers',
+      use: testRunner,
       role: test,
       dependsOn: [s.domain, s.application, s.adapters, s.methods, s.shell, s.ui.render, s.ui.testing],
       externals: ['*'],
     }),
     e2e: f.slot({
       dir: 'e2e',
+      use: journeys,
       role: test,
       dependsOn: [s.adapters, s.ui.testing, s.testRunner],
       externals: ['*'],
@@ -659,6 +673,14 @@ What doesn't fit well, and what it says about the structure:
   `renderShell` from `src/shell.ts`, above them. The shell's contract belongs below both, in `ports` or a slot of
   its own that `ui` depends on.
 - The slots for `e2e/`, `lint/` and the root's files are guesses from the folder docs.
+
+Each role and rule sits at the level that owns it. The root keeps only what needs its view: `test` and its grant to
+`ui.testing` and `testRunner`, which only the root can name, `no-cycle`, and `loose`. The layers (domain, ports,
+application, adapters) could become a reusable `hexagon` archetype once a second project wants one.
+
+Roles still resolve by specificity. In a component, `card.dsl.ts` matches `dsl` and `test`, and `dsl` wins because
+it extends `test`. `card.test.ts` matches only `test`, from the root. In `test-helpers`, `driver.ts` and
+`*.driver.ts` take their roles by name over the slot's default `test`.
 
 ### Weaver
 
