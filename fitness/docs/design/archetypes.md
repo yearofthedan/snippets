@@ -33,7 +33,7 @@ What's in:
 What's out:
 
 - General lint rules, such as style and correctness. oxlint and Biome cover those.
-- Architectures that aren't laid out in folders or file names ([open questions](#open-questions)).
+- Architectures that aren't laid out in folders or file names ([decided](#decided)).
 
 ## Principle
 
@@ -137,8 +137,9 @@ test files may import the test runner, and inside a component only `dom` and tes
 defined, for recursion. `s.domain` stands for the domain's whole surface, and `s.components.render` for one named
 surface. A handle is a placeholder resolved after the spec is built, so a misspelt `s.domian` is a type error.
 
-**Slots.** `f.slot({ dir, files, use, dependsOn, externals, rules })`. The key is the slot's name, and `dir` or
-`files` says where its units are.
+**Slots.** `f.slot({ dir, files, use, dependsOn, externals, role, rules })`. The key is the slot's name, and `dir`
+or `files` says where its units are. `role` gives every file in the slot a default role, for a folder that is all
+test code; a role matched by file name still wins.
 
 **Surfaces.** What a unit lets others import. An archetype declares one surface as a list of globs, or several
 named ones: `surface: { render: ['{name}.dom.ts'], testing: ['{name}.dsl.ts', '{name}.harness.ts'] }`. A file in no
@@ -195,6 +196,7 @@ interface SlotSpec {
   dependsOn?: Handle[];          // surfaces its units may import; default []
   externals?: string[];          // packages it may import: [] none, ['*'] any, globs; unset adds no limit
   cycles?: 'allow';              // tolerate a known cycle among its siblings
+  role?: Role;                   // default role for its files; a role matched by file name wins
   rules?: RuleSettings;
   description?: string;
 }
@@ -229,7 +231,7 @@ that hold their own `.dom.ts`.
    shallowest folder. Deeper matches are found when fitness looks inside that unit, if its archetype has a slot
    that finds them.
 3. A file belongs to its deepest unit.
-4. A file has exactly one role, the most specific one that matches it.
+4. A file has exactly one role: the most specific one that matches its name, or else its slot's default role.
 5. A file left among the own files of a unit with `loose: 'deny'` is `unclassified`, as today.
 
 **Most specific wins.** Line order in the config never matters.
@@ -283,8 +285,14 @@ reach and every inline rule that applies to A passes. A's reach is:
   extends.
 
 A surface reaches only what it lists. `s.ui.render` holds the files `ui` puts in `render`, and through
-`s.components.render` the components' render files, but nothing private to any of them. A child reaches its
-parent's own files only if they are listed: give them a `files` slot and depend on it.
+`s.components.render` the components' render files, but nothing private to any of them.
+
+A unit never reaches its parent. An archetype is used in many places, so it can't name a parent. Code a child shares
+with its parent moves to a slot of its own beside the child's, and the child's slot depends on it.
+
+Type imports are imports: they obey `dependsOn` and surfaces like any other. A unit exposes types through a public
+file, a types file it puts on a surface (`surface: { render: [...], types: ['{name}.types.ts'] }`), or a barrel
+(`surface: ['index.ts']`).
 
 Grants add up along the chain, and only inline rules take reach away. `externals` work the other way: an external
 edge must be allowed at every level of A's chain that sets them, and a role's `externals` count as part of each
@@ -300,9 +308,8 @@ reports a file matching `from` that has no edge to `to`. Selectors are roles, sl
 the innermost out, then the global `rules`, then the rule's defaults. Options resolve for the file a finding is
 reported on, so a project can set different thresholds for tests and code, or for ui components and utilities.
 
-**Edge kinds.** Edges record whether they are type-only and whether they re-export. Rules where type imports change
-the answer take `types: 'count' | 'ignore'`: `dependency-direction`, `unit-externals` and both cycle rules.
-Re-exports have their own rule.
+**Edge kinds.** Edges record whether they are type-only and whether they re-export. The cycle rules take
+`types: 'count' | 'ignore'`, since a type-only edge doesn't load at run time. Re-exports have their own rule.
 
 **Cycles.** `unit-cycle` builds, for each unit, the graph of edges between its children, and reports each loop, so
 two layers that import each other are a cycle even when no pair of files is. `no-cycle` does the same over files.
@@ -480,7 +487,7 @@ is built separately from rules. New fact sources add edges without touching rule
 - **Whole-graph rules can run less often.** Only fan-in and cycles need the whole project. Edge checks need only
   the changed files and the surfaces of what they import; a change on the target side finds its importers through
   the reverse index. A rule's phase is its default, and a project can change it per rule in
-  config or in a ruleset ([open question 3](#open-questions)).
+  config or in a ruleset ([decision 2](#decided)).
 - **Analysis is incremental.** The hook holds a TS 7.1 snapshot between calls and applies `snapshot.update()` for
   changed files instead of rebuilding the program.
 - **There is a budget.** An edit-phase check on working title stays under 500 ms, so a regression is
@@ -494,7 +501,7 @@ is built separately from rules. New fact sources add edges without touching rule
 | Nesting | through the path tree | parent, child and sibling relationships | no | no: a project is the smallest unit | `contains`, recursive |
 | Surface | barrel `index.ts`, or an `internal/` folder | entry-point rule | no | the project's entry point, imported by its scope | named surfaces per archetype |
 | File categories | no | yes | regex | no | roles, inherited |
-| Type and value edges | no | yes | yes | no | yes, as a `types` option |
+| Type and value edges | no | yes | yes | no | recorded; cycle rules can ignore type-only edges |
 | Re-export chains | no | no | no | no | resolved to the declarer |
 | Required imports | no | no | yes | no | `requires` |
 | Cycles | no | no | files | projects | files and units |
@@ -513,8 +520,9 @@ from Sheriff, the placeholder syntax and its barrel and internal-folder surfaces
 
 ## Validation
 
-Configs written against each repo as of 2026-11-21 (working title at `cb16dd5`). A preset is an archetype like any other, so a project either
-uses one as a slot's `use` or writes the shape out, as all three configs below do.
+Configs written against each repo as of 2026-11-21 (working title at `cb16dd5`). A preset is an archetype like any
+other, so a project either uses one as a slot's `use` or writes the shape out, as the configs below do. The last two,
+a NestJS app and a shared component library, are on paper; the spike checks them against sample projects.
 
 ### Working title
 
@@ -533,7 +541,6 @@ const harness = f.role({ files: '**/*.harness.ts', extends: test });
 const testPage = f.role({ files: '**/*.test-page.ts', extends: test });
 const driver = f.role({ files: '**/*.driver.ts', extends: test });
 const driverContract = f.role({ files: 'src/test-helpers/driver.ts', extends: test });
-const journey = f.role({ files: ['e2e/**/*.spec.ts', 'e2e/writer.ts', 'e2e/private-build.ts'], extends: test });
 const dom = f.role({ files: '**/*.dom.ts' });
 
 const component = f.archetype('component', (s, self) => ({
@@ -555,7 +562,6 @@ const ui = f.archetype('ui', (s) => ({
     testing: [s.components.testing],
     words: [s.strings],
   },
-  rules: { 'dependency-direction': { types: 'ignore' } },   // types from a component's private modules are fine
   slots: {
     components: f.slot({ dir: '{name}', use: component, dependsOn: [s.strings, s.icons] }),
     strings: f.slot({ dir: 'strings', description: "The app's words" }),
@@ -567,7 +573,7 @@ const workingTitle = f.archetype('working-title', (s) => ({
   loose: 'deny',
   roles: {
     test: test.with({ dependsOn: [s.ui.testing, s.testRunner] }),
-    dsl, harness, testPage, driver, driverContract, journey,
+    dsl, harness, testPage, driver, driverContract,
     dom,
   },
   rules: {
@@ -589,10 +595,17 @@ const workingTitle = f.archetype('working-title', (s) => ({
     }),
     testRunner: f.slot({
       dir: 'src/test-helpers',
+      role: test,
       dependsOn: [s.domain, s.application, s.adapters, s.methods, s.shell, s.ui.render, s.ui.testing],
       externals: ['*'],
     }),
-    e2e: f.slot({ dir: 'e2e', dependsOn: [s.adapters, s.ui.testing, s.testRunner], externals: ['*'], description: 'Journeys against the built app' }),
+    e2e: f.slot({
+      dir: 'e2e',
+      role: test,
+      dependsOn: [s.adapters, s.ui.testing, s.testRunner],
+      externals: ['*'],
+      description: 'Journeys against the built app',
+    }),
     lint: f.slot({ dir: 'lint', externals: ['*'] }),
     tooling: f.slot({ files: ['*.ts', 'scripts/**/*.ts'], dependsOn: [s.lint], externals: ['*'] }),
   },
@@ -614,6 +627,8 @@ How some edges come out:
 | `project/graph/graph.test.ts` → `project/graph/card/card.harness.ts` | ✅ | a parent reaches its child's `testing` surface |
 | `src/app.ts` → `project/project.dom.ts` | ✅ | the shell depends on `ui.render`, which holds the top-level components |
 | `src/app.ts` → `project/graph/card/card.dom.ts` | ❌ | `card` isn't in `ui.render` |
+| `project/graph/graph.ts` → `project/graph/card/card.ts` (type only) | ❌ | `card.ts` is on none of `card`'s surfaces |
+| `project/project.dom.ts` → `src/shell.ts` (type only) | ❌ | a unit never reaches its parent's files |
 | `domain/project.ts` → `test-helpers/staging.ts` | ❌ | domain depends on nothing, and isn't `test` |
 
 What fits:
@@ -637,10 +652,12 @@ What doesn't fit well, and what it says about the structure:
   planned move fixes. Once each component's harness, test page and driver live in its folder, those files join the
   component's `testing` surface and are reached through its parent, and only the generic runner stays in
   `testRunner`.
-- `types: 'ignore'` on `ui` lets every type-only import from ui files through, including types from domain, which
-  depcruise counted. Keeping types from a component's private modules allowed without that needs a surface for
-  types, which the config doesn't have.
-- `e2e/` is all test code, but its files have to be listed by role. A slot-level default role would be simpler.
+- `graph.ts`, `graph.test.ts` and `graph.test-page.ts` import `CardLook` and `cardLooks` from `card.ts`, which is
+  private to `card`. Either `card` puts them on a surface, such as a `types` surface holding `card.types.ts`, or
+  `graph` stops needing them.
+- `project.dom.ts`, `project.harness.ts` and `project.component.test.ts` import `TheShell`, `NewVersion` and
+  `renderShell` from `src/shell.ts`, above them. The shell's contract belongs below both, in `ports` or a slot of
+  its own that `ui` depends on.
 - The slots for `e2e/`, `lint/` and the root's files are guesses from the folder docs.
 
 ### Weaver
@@ -725,8 +742,8 @@ const fitness = f.archetype('fitness', (s) => ({
     integrations: f.slot({ dir: 'integrations' }),
     tests: f.slot({
       files: 'test/*.ts',
+      role: test,
       dependsOn: [s.model, s.app, s.reporters, s.adapters, s.entry, s.api, s.integrations],
-      externals: ['node:*'],
       description: 'Tests against the public units',
     }),
   },
@@ -744,6 +761,71 @@ What doesn't fit well:
 - Tests in `test/` reach internals such as `rules/shared.ts` because no surfaces are declared. A separate test tree
   gets less from the model than colocated tests.
 - "Every rule folder has a README.md" is a rule about the file system, not imports. Out of scope for now.
+
+### NestJS
+
+A Nest app is a set of feature modules, each a folder with `{name}.module.ts`, holding controllers, services,
+repositories and DTOs, and importing other modules through what they export.
+
+```ts
+const controller = f.role({ files: '**/*.controller.ts' });
+const service = f.role({ files: '**/*.service.ts' });
+const repository = f.role({ files: '**/*.repository.ts' });
+const dto = f.role({ files: ['**/*.dto.ts', '**/dto/*.ts'] });
+const test = f.role({ files: '**/*.spec.ts', externals: ['@nestjs/testing', 'jest'] });
+
+const nestModule = f.archetype('nest-module', (s, self) => ({
+  identify: { marker: '{name}.module.ts' },
+  surface: { api: ['{name}.module.ts', '{name}.service.ts', 'dto/*.ts', '*.dto.ts'] },
+  roles: { controller, service, repository, dto, test },
+  rules: { 'controllers-via-services': f.deny({ from: controller, to: repository }) },
+  slots: { submodule: f.slot({ dir: '{name}', use: self }) },
+}));
+
+const nestApp = f.archetype('nest-app', (s) => ({
+  loose: 'deny',
+  roles: { test },
+  slots: {
+    common: f.slot({ dir: 'src/common' }),
+    modules: f.slot({ dir: 'src/{name}', use: nestModule, dependsOn: [s.common, s.modules.api] }),
+    app: f.slot({ files: ['src/main.ts', 'src/app.*.ts'], dependsOn: [s.common, s.modules.api] }),
+    e2e: f.slot({ dir: 'test', role: test, dependsOn: [s.app], externals: ['supertest'] }),
+  },
+}));
+```
+
+What fits: a module is a unit found by its marker, and `api` stands in for its `exports`, so a module reaches
+another's service and DTOs but never its controller or repository. Controllers go through services. Modules that
+import each other (Nest's `forwardRef`) are a `unit-cycle`.
+
+What doesn't: Nest's real boundary is the `@Module` metadata, which fitness doesn't read. A module that imports a
+service's class but doesn't list its module in `imports` passes here and fails at run time. Apps laid out by type
+(`controllers/`, `services/`) need a different config, with roles doing the work of units.
+
+### Shared component library
+
+A library of components above the app's own, which app components import and which imports nothing from the app.
+It reuses working title's `component` archetype.
+
+```ts
+const designSystem = f.archetype('design-system', (s) => ({
+  surface: { render: [s.components.render], testing: [s.components.testing] },
+  slots: {
+    components: f.slot({ dir: '{name}', use: component, dependsOn: [s.tokens] }),
+    tokens: f.slot({ files: '*.css' }),
+  },
+}));
+
+// in the app's slots
+designSystem: f.slot({ dir: 'src/design-system', use: designSystem, externals: [] }),
+ui: f.slot({ dir: 'src/ui', use: ui, dependsOn: [s.application, s.designSystem.render] }),
+```
+
+What fits: both trees use one `component` archetype, so they share its surfaces and rules. The direction is one-way
+because nothing grants the library reach to `ui`. A library component's subcomponents stay private to it.
+
+What doesn't: a library component only one app component uses still sits in the library. Export use (#6) can show
+that as a fan-in of one, but nothing in the structure flags it.
 
 ## Migration
 
@@ -778,23 +860,24 @@ What doesn't fit well:
 6. Facts: exports, then export use (#6) and export surface (#5).
 7. Facts: calls, then #4a and #4b. Naming anonymous callbacks by their call lands with this.
 
-## Open questions
+## Decided
 
-1. **How does a child reach its parent's own files?** Today, by giving them a `files` slot. The alternative is a
-   parent handle in `dependsOn`.
-2. **Phase or rulesets for "when"?** A rule's `phase` says when its findings start to mean something; rulesets
-   carry "when" for a project. Keep both, with `phase` as the default, or drop `phase` and ship an `edit` ruleset.
-3. **Should per-function rules roll up?** `cognitive-complexity` and `function-cohesion` stay; open is whether they
-   also feed unit measures (worst or total per unit).
-4. **Severity?** Every finding is equal today. Whether rules or slots set a severity, and whether `--fail` honours
-   it, is undecided.
-5. **Lint adapter?** Findings could appear in oxlint or Biome as well as through the hook and SARIF.
-6. **Architectures not laid out in folders or names,** such as a boundary that exists only in a DI container or a
-   package's `exports` map. A known limit: finding units needs a path, a marker or a predicate over paths.
-7. **Type-only reach.** `types: 'ignore'` is the only way to let types cross a surface, and it lets all of a file's
-   type imports through. Is that enough, or does a surface need a way to expose types only?
-8. **Default role for a slot.** A folder that is all test code (`e2e/`) has its files listed in a role. Should a
-   slot be able to give every file in it a role?
+1. **A child never reaches its parent.** An archetype is used in many places, so a parent handle can't work. Code a
+   child shares with its parent moves to a slot of its own.
+2. **Phase and rulesets both stay.** `phase` is the rule's default, and rulesets are the project's override.
+3. **Per-function rules stay per function.** `cognitive-complexity` and `function-cohesion` take thresholds per slot
+   and role. Whether they roll up into unit measures is decided later, with working title's data.
+4. **No severity.** The project decides what fails, and the diff ratchet covers the rest.
+5. **No oxlint or Biome adapter.** A fitness language server is a possible later path for editor feedback, whatever
+   the linter.
+6. **Architectures not laid out in folders are a known limit,** such as a boundary that exists only in a DI container
+   or a package's `exports` map. Roles cover naming inside units, and `match` covers folders a marker can't. Folders
+   holding several components side by side are out of scope too, since they would need units made of file groups.
+   The [NestJS](#nestjs) and [shared component library](#shared-component-library) cases test how far the model
+   goes.
+7. **Type imports are imports.** They obey `dependsOn` and surfaces. A unit exposes types through a public file, a
+   types file on a surface, or a barrel. The type/value distinction stays only in the cycle rules' `types` option.
+8. **A slot can give its files a default role** (`role: test` on `e2e`). A role matched by file name wins.
 
 ## Noted concerns
 
@@ -810,4 +893,5 @@ What doesn't fit well:
 ## Next step
 
 A spike before more design: the builders with real types, unit resolution, and edge verdicts on working title,
-checked against the table above. It tests the riskiest part (inference) and the core semantics together.
+checked against the table above, and the NestJS and shared component library configs against sample projects. It
+tests the riskiest part (inference) and the core semantics together.
