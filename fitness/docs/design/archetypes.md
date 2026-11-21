@@ -17,13 +17,25 @@ whole graph. One model serves three consumers: lint (findings), a query API for 
 The rule contract is per module (`RuleContext.module`), so rules that need the whole graph (fan-in, export use,
 export surface, repeated call sequences) can't be written.
 
-## Scope
+## Vision and scope
 
-- One tool, two rule families over one set of facts, graph, diff, hook and rulesets:
-  - **architecture:** units, direction, surfaces, re-exports, edge rules;
-  - **quality:** cohesion, complexity, and later size, fan-in and orchestration metrics.
-- Not in scope: cycles (oxlint `import/no-cycle`), non-TS files (CSS, README presence), external package rules (see
-  [open questions](#open-questions)).
+Fitness is a declared model of a codebase's modules, used to keep it modular. Checks run against the model; agent
+queries and Weaver codemods read the same model. A check belongs in fitness when it is about the modules: their
+boundaries, their dependencies, or a measure of a unit.
+
+In:
+
+- **Structure:** units, direction, surfaces, re-exports, edge rules, required edges.
+- **Cycles:** between units (needs the model) and between files (cheap on the graph already built, and the
+  projects don't share a linter: Weaver uses Biome, not oxlint).
+- **External dependencies** of a unit (`node:fs` not in domain), later.
+- **Unit measures:** cohesion, size, fan-in, export surface and use, orchestration weight.
+
+Out:
+
+- Generic code quality not measured per unit, such as per-function complexity. See
+  [open questions](#open-questions) for what that means for `cognitive-complexity` and `function-cohesion`.
+- Non-TS files (CSS, README presence).
 
 ## Concepts
 
@@ -90,6 +102,7 @@ interface Slot extends Partial<Identify> {
   dependsOn?: Dependency[] | '*';   // sibling slots this slot may import; default []
   shared?: true | { from: string[] };  // implicitly in every sibling's dependsOn (optionally only for these roles)
   rules?: RuleSettings;             // after the archetype's
+  cycles?: 'allow';                 // tolerate a known unit cycle among this slot's siblings
   description?: string;
 }
 
@@ -158,6 +171,16 @@ Each failure is one finding per file pair per rule, as today. Which rule:
 | surface chain | `unit-surface` (new) |
 | a named `edges` entry | `edges/<name>` |
 | re-exporting another unit's names | `no-cross-unit-reexport` (renamed; `allow` takes slot names) |
+| units depending on each other in a loop | `unit-cycle` (new) |
+| files depending on each other in a loop | `no-cycle` (new) |
+
+**Cycles.** Both are project-scope rules, `phase: 'edit'` (Tarjan over the graph is linear). `unit-cycle` builds,
+for each unit, the graph of its children's edges and reports each strongly connected component; so two layers that
+import each other are a cycle even when no single file is. `no-cycle` does the same over files. Each reports one
+finding per edge inside a component, keyed `unit-cycle:src/ui->src/application` or `no-cycle:a.ts->b.ts`, value 1:
+keying on the whole component would turn every growth of a cycle into resolved plus added. Type-only edges are
+left out by default (they don't load at run time) and counted with `{ types: true }`. A slot can allow a known
+mutual dependency with `cycles: 'allow'`, which shows in `where` so an agent sees it is tolerated, not endorsed.
 
 ## Rule contract
 
@@ -325,6 +348,7 @@ gates on `diff` so it never makes the metrics worse.
 | Type vs value edges | no | yes | yes | yes, on `dependsOn` and surface |
 | Re-export chains | no | no | no | resolved to the declarer (existing facts) |
 | Required imports | no | no | yes | `requires` |
+| Cycles | no | no | files | files and units |
 | Quality metrics | no | no | no | same tool |
 | Query API | no | no | no | yes |
 
@@ -353,7 +377,8 @@ export const hexagon = (slots: Record<string, Partial<Slot>> = {}) =>
 
 ### Working title
 
-Replaces every rule in `.dependency-cruiser.mjs` except `no-circular` (oxlint).
+Replaces every rule in `.dependency-cruiser.mjs`, `no-circular` included (`no-cycle` with `types: true`, since depcruise
+counts pre-compilation deps).
 
 ```ts
 import { archetype, defineConfig, deny, requires } from 'fitness';
@@ -475,6 +500,8 @@ export default defineConfig({
 ```
 
 Fits: the tiers and the plugin slices (peers isolated by default, so a Svelte plugin can't import the Vue one).
+`unit-cycle` reports `tsEngine` ↔ `operations` and `daemon` ↔ `adapters` (value edges exist both ways), which is the
+clearest statement of the two contract-file smells below.
 
 Misfits, each a real design smell the model surfaces rather than a model gap:
 
@@ -485,7 +512,7 @@ Misfits, each a real design smell the model surfaces rather than a model gap:
   re-exports the Node one. To express "ports hold contracts", ports would need `contract` and `impl` file-group
   slots, and the re-export becomes a `no-cross-unit-reexport` finding. `utils/file-walk.ts` imports
   `NodeFileSystem` directly.
-- `domain-purity.test.ts` (no `node:fs` in domain) can't move into fitness without external-module rules.
+- `domain-purity.test.ts` (no `node:fs` in domain) moves into fitness once unit externals land.
 
 ### Fitness
 
@@ -558,8 +585,8 @@ Misfits:
 1. Model: archetype types, unit resolution, `unclassified` and `ambiguous-unit`, `fitness model`, migrate-config.
    Existing rules run on `unit` with a shim.
 2. Rule contract: scopes, `ModelView`, phase, `--phase`. Port the built-in rules.
-3. Structure: surfaces, roles, `edges`, `requires`, `unit-surface`, `no-cross-unit-reexport`. Working title config
-   lands here, report-only beside depcruise.
+3. Structure: surfaces, roles, `edges`, `requires`, `unit-surface`, `no-cross-unit-reexport`, `unit-cycle`,
+   `no-cycle`. Working title config lands here, report-only beside depcruise.
 4. Queries: `where`, `may`, `place`. Try them from omp on working title before going further, so later work is
    shaped by a real consumer.
 5. Facts: exports, then export-use (#6) and export-surface (#5).
@@ -575,8 +602,14 @@ Decisions this doc proposes, which need a yes or a change:
    fitness rules want isolation; working title components opt in.
 3. **Structure intersects, options cascade nearest-wins.** The asymmetry is deliberate.
 4. **Phase lives on the rule**, overridable by config and rulesets, rather than a shipped `edit` ruleset.
-5. **External modules** (`node:fs` not in domain): add `externals` to `dependsOn` later, or leave it to oxlint's
-   `no-restricted-imports` per directory. Leaning oxlint, since it's per-path anyway.
+5. **External modules** are in scope (a unit's dependencies are part of the model, and Weaver has no oxlint). Shape
+   proposed: `externals: { allow?: string[]; deny?: string[] }` on a slot, matched against bare specifiers, intersecting
+   down the chain like other structure. Lands after delivery step 6; needs the analysis to keep unresolved external
+   edges, which it drops today.
 6. **Cross-cutting units** are `shared` slots, optionally restricted by role. None of the three projects has a truly
    global utility; working title's `strings` and weaver's `utils` both sit at one level with normal `dependsOn`. So
    `shared` is mainly for test helpers. Worth keeping it that narrow.
+7. **Per-function rules.** Under the vision, `cognitive-complexity` and `function-cohesion` are generic quality, not
+   unit measures. Options: drop them (oxlint/Biome have complexity rules), or keep them only as inputs to a unit
+   measure (worst or summed complexity per unit). `module-cohesion` stays: a module is the smallest unit. Proposed:
+   keep both running until unit measures exist, then decide with data from working title.
