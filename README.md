@@ -30,9 +30,6 @@ transcripts on this machine. The transcripts and everything extracted from them 
   original note; [`compare.py`](./omp-notes/compare.py) lines runs up side by side
 - [`briefs/`](./omp-notes/briefs) — narrow reviewer briefs tested with the replay
 
-### [warp](https://github.com/yearofthedan/warp)
-A CLI that checks a TypeScript codebase against a declared model of its modules, in its own repo.
-
 ### [dev-skills](./plugins/dev-skills)
 A plugin of development rules and skills, published from this repo's marketplace
 ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)).
