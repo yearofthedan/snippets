@@ -96,8 +96,8 @@ import { defineConfig, w } from 'warp';
 
 const testRunner = w.archetype('test-runner')
   .contains(() => w.parts()
-    .part('rest', w.files('**')))
-  .exposes((s) => ({ runner: s.rest }));   // proposed: the runner as one surface
+    .part('runner', w.files('**')))
+  .exposes((s) => ({ runner: s.runner }));   // proposed: the runner as one surface
 
 const component = w.archetype('component')
   .identify({ marker: '{name}.dom.ts' })
@@ -144,7 +144,7 @@ typed from the ones before it.
 
 **Parts.** `.part(name, w.files(pattern, options?))` is a group of the unit's own files. `.part(name, w.dir(path,
 archetype?, options?))` is a child unit per matching folder; without an archetype, the folder is a plain unit whose
-files are all exposed. A catch-all part is called `rest`, by convention: `.part('rest', w.files('**'))`.
+files are all exposed. A catch-all part is named for what it holds, such as `.part('src', w.files('**'))`.
 
 **Order is dependency order.** A part sees only the parts declared above it, so `subcomponent` comes before `dom`, and
 layers before the ui that uses them. Two sibling parts can't use each other, so sibling parts can't form a cycle.
@@ -241,7 +241,7 @@ type RuleSettings = 'off' | Record<string, boolean | object | InlineRule>;   // 
 
 interface WarpConfig {
   root: Archetype;
-  tsconfig?: string;             // default 'tsconfig.json'; its program is what Warp reads
+  tsconfig?: string | string[];  // default 'tsconfig.json'; their programs are what Warp reads
   plugins?: Record<string, Plugin>;
   rules?: RuleSettings;
 }
@@ -265,7 +265,7 @@ is one unit; with one (`'{name}'`), a unit per match; a list of paths is a unit 
 - Dir parts: a literal segment beats a placeholder, which beats `**`. `strings` beats `{name}`, so `strings` isn't
   taken as a component.
 - Files parts: the longer literal suffix wins. `*.test-page.ts` beats `*.ts`, and `{name}.dom.ts` beats `*.ts`.
-  `rest` (`**`) loses to everything.
+  A catch-all (`**`) loses to everything.
 - Equal specificity is a config error that names both candidates and suggests narrowing a pattern. `*.dsl.ts`
   against `card.*` is one.
 
@@ -561,18 +561,18 @@ import { defineConfig, w } from 'warp';
 const testRunner = w.archetype('test-runner')
   .contains(() => w.parts()
     .part('contract', w.files(['driver.ts', 'steps.ts', 'seed.ts', 'narrowing.ts', 'scenario-file.ts', 'ids.ts']))
-    .part('rest', w.files('**', { using: (s) => [s.contract] })))
-  .exposes((s) => ({ contract: s.contract, runner: s.rest }));
+    .part('runner', w.files('**', { using: (s) => [s.contract] })))
+  .exposes((s) => ({ contract: s.contract, runner: s.runner }));
 
 // a folder of code whose tests need the runner: domain, application, adapters, lint
 const layer = w.archetype('layer')
   .requires({ testRunner, methods: w.dir() })
   .contains(({ required }) => w.parts()
-    .part('rest', w.files('**'))
+    .part('src', w.files('**'))
     .part('test', w.files('**/*.test.ts', {
-      using: (s) => [s.rest, required.testRunner.runner, required.testRunner.contract, required.methods, w.pkg('vite-plus/*')],
+      using: (s) => [s.src, required.testRunner.runner, required.testRunner.contract, required.methods, w.pkg('vite-plus/*')],
     })))
-  .exposes((s) => ({ code: s.rest }));
+  .exposes((s) => ({ code: s.src }));
 
 const component = w.archetype('component')
   .identify({ marker: '{name}.dom.ts' })
@@ -600,7 +600,7 @@ const component = w.archetype('component')
 const ui = w.archetype('ui')
   .contains(() => w.parts()
     .part('components', w.dir('{name}', component))
-    .part('strings', w.dir('strings'))
+    .part('strings', w.dir('strings', undefined, { description: "The app's words" }))
     .part('icons', w.dir('icons'))
     .part('transition', w.files('transition.ts'))
     .part('test', w.files('*.test.ts', { using: (s) => [s.transition, w.pkg('vite-plus/*')] })))
@@ -702,7 +702,7 @@ What doesn't fit well, and what it says about the structure:
   such as a `types` part holding `card.types.ts`, or `graph` stops needing them.
 - `project` imports `TheShell`, `NewVersion` and `renderShell` from `src/shell.ts`, above it. A component that
   requires the app's shell is the smell. The shell's contract belongs below both, in `ports` or the application.
-- The runner's own tests sit in `rest`, which is exposed as `runner`, so components may import them. Tests inside a
+- The runner's own tests sit in `runner`, which is exposed as `runner`, so components may import them. Tests inside a
   provided archetype leak through its surface unless the archetype gives them their own part.
 - Test parts carry long `using` lists (`component.test` has 11 entries), mostly "everything in my unit plus the
   runner".
@@ -719,17 +719,17 @@ slices. Layers expose all of their code, so only `using` limits reach.
 const layer = w.archetype('layer')
   .requires({ testHelpers: w.dir() })
   .contains(({ required }) => w.parts()
-    .part('rest', w.files('**'))
-    .part('test', w.files('**/*.test.ts', { using: (s) => [s.rest, required.testHelpers, w.pkg('vitest')] })))
-  .exposes((s) => ({ code: s.rest }));
+    .part('src', w.files('**'))
+    .part('test', w.files('**/*.test.ts', { using: (s) => [s.src, required.testHelpers, w.pkg('vitest')] })))
+  .exposes((s) => ({ code: s.src }));
 
 const plugin = w.archetype('plugin')
   .description('One framework: detection, engine, helpers')
   .requires({ testHelpers: w.dir(), domain: layer, ports: layer, utils: layer, engines: layer })
   .contains(({ required }) => w.parts()
-    .part('rest', w.files('**', { using: [required.domain, required.ports, required.utils, required.engines, w.pkg('*')] }))
-    .part('test', w.files('**/*.test.ts', { using: (s) => [s.rest, required.testHelpers, w.pkg('vitest')] })))
-  .exposes((s) => ({ code: s.rest }));
+    .part('src', w.files('**', { using: [required.domain, required.ports, required.utils, required.engines, w.pkg('*')] }))
+    .part('test', w.files('**/*.test.ts', { using: (s) => [s.src, required.testHelpers, w.pkg('vitest')] })))
+  .exposes((s) => ({ code: s.src }));
 
 const plugins = w.archetype('plugins')
   .contains(() => w.parts().part('plugin', w.dir('{name}', plugin)));
@@ -756,7 +756,7 @@ const weaver = w.archetype('weaver')
     testHelpers: s.testHelpers, domain: s.domain, ports: s.ports, utils: s.utils, engines: s.engines,
   }));
 
-export default defineConfig({ root: weaver, tsconfig: 'tsconfig.warp.json' });   // see below
+export default defineConfig({ root: weaver, tsconfig: ['tsconfig.json', 'tsconfig.test.json'] });
 ```
 
 What fits: the tiers, and plugins as slices: the `plugin` part doesn't list itself, so a Svelte plugin couldn't
@@ -776,7 +776,7 @@ What doesn't, mostly design smells the model brings out rather than gaps in it:
 - The plugins sit two levels down, so `weaver` provides four tiers and `plugin` requires them directly; `plugins` in
   between says nothing. That's still a long interface, and it's the plumbing exact `using` costs.
 - Weaver's `tsconfig.json` leaves tests out and `tsconfig.test.json` holds only tests, so modelling both needs a
-  tsconfig that includes both. Either Warp accepts a list of tsconfigs or the project adds one.
+  tsconfig that includes both. Warp accepts a list, `tsconfig: ['tsconfig.json', 'tsconfig.test.json']`, since projects split them in different ways.
 - `src/cli-workspace-default.integration.test.ts` sits at the root of `src`, in no part, and is `unclassified`.
 
 ### Warp itself
@@ -787,9 +787,9 @@ Warp's own package, still at `fitness/` in snippets.
 const rule = w.archetype('rule')
   .requires({ core: w.files() })
   .contains(({ required }) => w.parts()
-    .part('rest', w.files('*.ts', { using: [required.core] }))
-    .part('test', w.files('*.test.ts', { using: (s) => [s.rest, w.pkg('node:*')] })))
-  .exposes((s) => ({ rule: s.rest }));
+    .part('src', w.files('*.ts', { using: [required.core] }))
+    .part('test', w.files('*.test.ts', { using: (s) => [s.src, w.pkg('node:*')] })))
+  .exposes((s) => ({ rule: s.src }));
 
 const rules = w.archetype('rules')
   .contains(() => w.parts()
