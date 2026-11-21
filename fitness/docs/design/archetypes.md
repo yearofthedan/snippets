@@ -775,8 +775,8 @@ What doesn't, mostly design smells the model brings out rather than gaps in it:
 - `operations` imports `safe-regex2`. That needs a decision, not a config change.
 - The plugins sit two levels down, so `weaver` provides four tiers and `plugin` requires them directly; `plugins` in
   between says nothing. That's still a long interface, and it's the plumbing exact `using` costs.
-- Weaver's `tsconfig.json` leaves tests out and `tsconfig.test.json` holds only tests, so modelling both needs a
-  tsconfig that includes both. Warp accepts a list, `tsconfig: ['tsconfig.json', 'tsconfig.test.json']`, since projects split them in different ways.
+- Weaver's `tsconfig.json` leaves tests out and `tsconfig.test.json` holds only tests, so the config lists both.
+  Projects split their tsconfigs in different ways, so `tsconfig` takes a list.
 - `src/cli-workspace-default.integration.test.ts` sits at the root of `src`, in no part, and is `unclassified`.
 
 ### Warp itself
