@@ -470,8 +470,10 @@ is built separately from rules. New fact sources add edges without touching rule
 
 - **Unit resolution is cached.** Finding units walks the file system for markers. The result is cached and rebuilt
   only when a file is added, removed or renamed.
-- **Graph rules run less often.** Rules that need the whole project (fan-in, cycles, `importableBy` across the
-  graph) can run at commit through their phase, while per-file rules on changed files run after every edit.
+- **Whole-graph rules can run less often.** Only fan-in and cycles need the whole project. Edge checks, including
+  `importableBy`, need only the changed files and the roles of what they import; a change on the target side finds
+  its importers through the reverse index. A rule's phase is its default, and a project can change it per rule in
+  config or in a ruleset ([open question 3](#open-questions)).
 - **Analysis is incremental.** The hook holds a TS 7.1 snapshot between calls and applies `snapshot.update()` for
   changed files instead of rebuilding the program.
 - **There is a budget.** An edit-phase check on working title stays under 500 ms, so a regression is
